@@ -1,0 +1,1679 @@
+{
+  "dataset": "FORCE 2020 - train",
+  "source_file": "D:\\SOHAM ALL\\hackathons\\SIH\\data\\raw\\force2020\\train.csv",
+  "generated_at": "2026-09-06T18:17:00.265701+00:00",
+  "row_count": 1170511,
+  "column_count": 29,
+  "columns": [
+    {
+      "name": "WELL",
+      "dtype": "object",
+      "non_null": 1170511,
+      "null_count": 0,
+      "null_fraction": 0.0,
+      "unique_count": 98,
+      "minimum": null,
+      "maximum": null,
+      "mean": null,
+      "std": null,
+      "example_values": [
+        "25/2-7",
+        "29/6-1",
+        "25/7-2",
+        "35/11-6",
+        "34/2-4",
+        "34/11-2 S",
+        "25/4-5",
+        "34/10-21",
+        "30/6-5",
+        "25/3-1"
+      ]
+    },
+    {
+      "name": "DEPTH_MD",
+      "dtype": "float64",
+      "non_null": 1170511,
+      "null_count": 0,
+      "null_fraction": 0.0,
+      "unique_count": null,
+      "minimum": 136.086,
+      "maximum": 5436.632,
+      "mean": 2184.086951095959,
+      "std": 997.1821047495898,
+      "example_values": [
+        494.528,
+        494.68,
+        494.832,
+        494.984,
+        495.136,
+        495.288,
+        495.44,
+        495.592,
+        495.744,
+        495.896
+      ]
+    },
+    {
+      "name": "X_LOC",
+      "dtype": "float64",
+      "non_null": 1159736,
+      "null_count": 10775,
+      "null_fraction": 0.009205,
+      "unique_count": null,
+      "minimum": 426898.78125,
+      "maximum": 572632.75,
+      "mean": 485631.03274026373,
+      "std": 34556.41453068879,
+      "example_values": [
+        437641.96875,
+        437641.96875,
+        437641.96875,
+        437641.96875,
+        437641.96875,
+        437641.96875,
+        437641.96875,
+        437641.96875,
+        437641.96875,
+        437641.96875
+      ]
+    },
+    {
+      "name": "Y_LOC",
+      "dtype": "float64",
+      "non_null": 1159736,
+      "null_count": 10775,
+      "null_fraction": 0.009205,
+      "unique_count": null,
+      "minimum": 6406641.0,
+      "maximum": 6856661.0,
+      "mean": 6681275.51446493,
+      "std": 128152.43468289166,
+      "example_values": [
+        6470972.5,
+        6470972.5,
+        6470972.5,
+        6470972.5,
+        6470972.5,
+        6470972.5,
+        6470972.5,
+        6470972.5,
+        6470972.5,
+        6470972.5
+      ]
+    },
+    {
+      "name": "Z_LOC",
+      "dtype": "float64",
+      "non_null": 1159736,
+      "null_count": 10775,
+      "null_fraction": 0.009205,
+      "unique_count": null,
+      "minimum": -5395.563477,
+      "maximum": -111.0859909,
+      "mean": -2138.5271425449564,
+      "std": 970.9425841667812,
+      "example_values": [
+        -469.5018311,
+        -469.6538086,
+        -469.8057861,
+        -469.9577942,
+        -470.1097717,
+        -470.2617798,
+        -470.4137878,
+        -470.5657959,
+        -470.7177734,
+        -470.8697815
+      ]
+    },
+    {
+      "name": "GROUP",
+      "dtype": "object",
+      "non_null": 1169233,
+      "null_count": 1278,
+      "null_fraction": 0.001092,
+      "unique_count": 14,
+      "minimum": null,
+      "maximum": null,
+      "mean": null,
+      "std": null,
+      "example_values": [
+        "HORDALAND GP.",
+        "SHETLAND GP.",
+        "VIKING GP.",
+        "ROGALAND GP.",
+        "DUNLIN GP.",
+        "NORDLAND GP.",
+        "CROMER KNOLL GP.",
+        "BAAT GP.",
+        "VESTLAND GP.",
+        "HEGRE GP."
+      ]
+    },
+    {
+      "name": "FORMATION",
+      "dtype": "object",
+      "non_null": 1033517,
+      "null_count": 136994,
+      "null_fraction": 0.117038,
+      "unique_count": 69,
+      "minimum": null,
+      "maximum": null,
+      "mean": null,
+      "std": null,
+      "example_values": [
+        "Utsira Fm.",
+        "Kyrre Fm.",
+        "Lista Fm.",
+        "Heather Fm.",
+        "Skade Fm.",
+        "Statfjord Fm.",
+        "Vaale Fm.",
+        "Jorsalfare Fm.",
+        "Grid Fm.",
+        "Balder Fm."
+      ]
+    },
+    {
+      "name": "CALI",
+      "dtype": "float64",
+      "non_null": 1082634,
+      "null_count": 87877,
+      "null_fraction": 0.075076,
+      "unique_count": null,
+      "minimum": 2.3440001011,
+      "maximum": 28.278999329,
+      "mean": 13.185677306104612,
+      "std": 3.7989070803661846,
+      "example_values": [
+        19.480834961,
+        19.468799591,
+        19.468799591,
+        19.459281921,
+        19.453100204,
+        19.453100204,
+        19.462495804,
+        19.468799591,
+        19.468799591,
+        19.468799591
+      ]
+    },
+    {
+      "name": "RSHA",
+      "dtype": "float64",
+      "non_null": 630650,
+      "null_count": 539861,
+      "null_fraction": 0.461218,
+      "unique_count": null,
+      "minimum": 0.0001,
+      "maximum": 2193.904541,
+      "mean": 10.694663970937087,
+      "std": 100.64259731940996,
+      "example_values": [
+        0.2976329029,
+        0.2694289982,
+        0.2896195948,
+        0.3266780078,
+        0.352922976,
+        0.2864224911,
+        0.2787516117,
+        0.2493941635,
+        0.2785691321,
+        0.3433556557
+      ]
+    },
+    {
+      "name": "RMED",
+      "dtype": "float64",
+      "non_null": 1131518,
+      "null_count": 38993,
+      "null_fraction": 0.033313,
+      "unique_count": null,
+      "minimum": -0.008418695,
+      "maximum": 1988.616333,
+      "mean": 4.986978272181809,
+      "std": 54.67268651260465,
+      "example_values": [
+        1.6114097834,
+        1.6180702448,
+        1.6264585257,
+        1.6215940714,
+        1.6026790142,
+        1.5855668783,
+        1.5765693188,
+        1.5870107412,
+        1.613673687,
+        1.6346218586
+      ]
+    },
+    {
+      "name": "RDEP",
+      "dtype": "float64",
+      "non_null": 1159496,
+      "null_count": 11015,
+      "null_fraction": 0.00941,
+      "unique_count": null,
+      "minimum": 0.031700559,
+      "maximum": 1999.887085,
+      "mean": 10.6910255329492,
+      "std": 113.94800511047836,
+      "example_values": [
+        1.7986813784,
+        1.7956413031,
+        1.8007333279,
+        1.8015166521,
+        1.7952990532,
+        1.8047186136,
+        1.8054984808,
+        1.8083672523,
+        1.8158134222,
+        1.8139158487
+      ]
+    },
+    {
+      "name": "RHOB",
+      "dtype": "float64",
+      "non_null": 1009242,
+      "null_count": 161269,
+      "null_fraction": 0.137777,
+      "unique_count": null,
+      "minimum": 0.7209711671,
+      "maximum": 3.4578199387,
+      "mean": 2.284986697379867,
+      "std": 0.25328351039868996,
+      "example_values": [
+        1.884185791,
+        1.8897935152,
+        1.8965227604,
+        1.891912818,
+        1.8800340891,
+        1.8796874285,
+        1.8787307739,
+        1.8678369522,
+        1.8472329378,
+        1.836309433
+      ]
+    },
+    {
+      "name": "GR",
+      "dtype": "float64",
+      "non_null": 1170511,
+      "null_count": 0,
+      "null_fraction": 0.0,
+      "unique_count": null,
+      "minimum": 0.1092843339,
+      "maximum": 1076.9638672,
+      "mean": 70.91369646125943,
+      "std": 34.23148647924061,
+      "example_values": [
+        80.20085144,
+        79.262886047,
+        74.821998596,
+        72.878921509,
+        71.729141235,
+        72.014419556,
+        72.588088989,
+        71.283050537,
+        69.721435547,
+        66.677726746
+      ]
+    },
+    {
+      "name": "SGR",
+      "dtype": "float64",
+      "non_null": 69353,
+      "null_count": 1101158,
+      "null_fraction": 0.94075,
+      "unique_count": null,
+      "minimum": -777.9859619,
+      "maximum": 963.60858154,
+      "mean": 64.89590964899855,
+      "std": 38.43581819990903,
+      "example_values": [
+        37.495346069,
+        38.466400146,
+        39.062999725,
+        39.657657623,
+        39.763004303,
+        39.192649841,
+        39.917057037,
+        41.748435974,
+        43.859973907,
+        42.424663544
+      ]
+    },
+    {
+      "name": "NPHI",
+      "dtype": "float64",
+      "non_null": 765409,
+      "null_count": 405102,
+      "null_fraction": 0.34609,
+      "unique_count": null,
+      "minimum": -0.03582247,
+      "maximum": 0.9995702505,
+      "mean": 0.33196553125788175,
+      "std": 0.13048259804311577,
+      "example_values": [
+        0.7658668756,
+        0.8002619743,
+        0.7659568787,
+        0.7025208473,
+        0.6397075057,
+        0.5880137682,
+        0.5639474988,
+        0.5822533965,
+        0.6037314534,
+        0.6329815984
+      ]
+    },
+    {
+      "name": "PEF",
+      "dtype": "float64",
+      "non_null": 671692,
+      "null_count": 498819,
+      "null_fraction": 0.426155,
+      "unique_count": null,
+      "minimum": 0.0997178704,
+      "maximum": 383.12997437,
+      "mean": 6.319718598290758,
+      "std": 10.955359759029138,
+      "example_values": [
+        20.915468216,
+        19.383012772,
+        22.591518402,
+        32.19190979,
+        38.495632172,
+        43.657482147,
+        42.236221313,
+        39.933563232,
+        39.163223267,
+        37.802932739
+      ]
+    },
+    {
+      "name": "DTC",
+      "dtype": "float64",
+      "non_null": 1089648,
+      "null_count": 80863,
+      "null_fraction": 0.069084,
+      "unique_count": null,
+      "minimum": 7.4151320457,
+      "maximum": 320.47888184,
+      "mean": 113.35808449620797,
+      "std": 29.990495681430012,
+      "example_values": [
+        161.13117981,
+        160.60346985,
+        160.1736145,
+        160.14942932,
+        160.12834167,
+        160.14929199,
+        161.25038147,
+        162.2144165,
+        161.57510376,
+        160.58335876
+      ]
+    },
+    {
+      "name": "SP",
+      "dtype": "float64",
+      "non_null": 864247,
+      "null_count": 306264,
+      "null_fraction": 0.26165,
+      "unique_count": null,
+      "minimum": -999.0,
+      "maximum": 526.54730225,
+      "mean": 60.03398029680414,
+      "std": 76.5743585433829,
+      "example_values": [
+        24.612379074,
+        23.895530701,
+        23.91635704,
+        23.79368782,
+        24.104078293,
+        23.931278229,
+        23.381790161,
+        23.632165909,
+        22.163541794,
+        23.659925461
+      ]
+    },
+    {
+      "name": "BS",
+      "dtype": "float64",
+      "non_null": 682657,
+      "null_count": 487854,
+      "null_fraction": 0.416787,
+      "unique_count": null,
+      "minimum": 6.0,
+      "maximum": 26.000001907,
+      "mean": 11.931431997836532,
+      "std": 3.3302419139440484,
+      "example_values": [
+        26.000001907,
+        26.000001907,
+        26.000001907,
+        26.000001907,
+        26.000001907,
+        26.000001907,
+        26.000001907,
+        26.000001907,
+        26.000001907,
+        26.000001907
+      ]
+    },
+    {
+      "name": "ROP",
+      "dtype": "float64",
+      "non_null": 535071,
+      "null_count": 635440,
+      "null_fraction": 0.542874,
+      "unique_count": null,
+      "minimum": -0.117977008,
+      "maximum": 47015.125,
+      "mean": 137.36796486382477,
+      "std": 1539.3835579518816,
+      "example_values": [
+        34.63640976,
+        34.63640976,
+        34.779556274,
+        39.965164185,
+        57.483764648,
+        75.281410217,
+        76.199951172,
+        76.199951172,
+        75.898796082,
+        68.121261597
+      ]
+    },
+    {
+      "name": "DTS",
+      "dtype": "float64",
+      "non_null": 174613,
+      "null_count": 995898,
+      "null_fraction": 0.850823,
+      "unique_count": null,
+      "minimum": 69.16317749,
+      "maximum": 676.578125,
+      "mean": 204.6550187265143,
+      "std": 71.06846119940478,
+      "example_values": [
+        166.53327942,
+        169.69215393,
+        172.49353027,
+        174.39024353,
+        174.93399048,
+        173.81167603,
+        171.2111969,
+        167.77903748,
+        164.58799744,
+        162.10554504
+      ]
+    },
+    {
+      "name": "DCAL",
+      "dtype": "float64",
+      "non_null": 298833,
+      "null_count": 871678,
+      "null_fraction": 0.744699,
+      "unique_count": null,
+      "minimum": -12.21545887,
+      "maximum": 10011.422852,
+      "mean": 1.2238485842093358,
+      "std": 54.37285887618499,
+      "example_values": [
+        -6.611575127,
+        -5.933548927,
+        -4.91903162,
+        -4.759111881,
+        -5.353021145,
+        -6.242249489,
+        -7.009203434,
+        -7.426774502,
+        -7.687026978,
+        -7.821779251
+      ]
+    },
+    {
+      "name": "DRHO",
+      "dtype": "float64",
+      "non_null": 987857,
+      "null_count": 182654,
+      "null_fraction": 0.156046,
+      "unique_count": null,
+      "minimum": -7429.338867,
+      "maximum": 2.8369383812,
+      "mean": 0.012196377859673823,
+      "std": 7.477797797682435,
+      "example_values": [
+        -0.574927628,
+        -0.570188403,
+        -0.574245155,
+        -0.586315274,
+        -0.597913623,
+        -0.601599991,
+        -0.598368526,
+        -0.602039278,
+        -0.614363968,
+        -0.621812582
+      ]
+    },
+    {
+      "name": "MUDWEIGHT",
+      "dtype": "float64",
+      "non_null": 316151,
+      "null_count": 854360,
+      "null_fraction": 0.729903,
+      "unique_count": null,
+      "minimum": 0.1258177161,
+      "maximum": 185.73092651,
+      "mean": 1.2163287577405124,
+      "std": 10.180833999178622,
+      "example_values": [
+        0.129412517,
+        0.129412517,
+        0.129412517,
+        0.129412517,
+        0.129412517,
+        0.129412517,
+        0.129412517,
+        0.129412517,
+        0.129412517,
+        0.129412517
+      ]
+    },
+    {
+      "name": "RMIC",
+      "dtype": "float64",
+      "non_null": 176160,
+      "null_count": 994351,
+      "null_fraction": 0.849502,
+      "unique_count": null,
+      "minimum": 0.0565855578,
+      "maximum": 10000.0,
+      "mean": 7.79680871358215,
+      "std": 89.74180708530147,
+      "example_values": [
+        2.2764158249,
+        2.5692517757,
+        2.8574922085,
+        2.6093201637,
+        1.7378460169,
+        1.4489517212,
+        1.4984797239,
+        2.1119027138,
+        2.3801229,
+        2.2144393921
+      ]
+    },
+    {
+      "name": "ROPA",
+      "dtype": "float64",
+      "non_null": 192325,
+      "null_count": 978186,
+      "null_fraction": 0.835691,
+      "unique_count": null,
+      "minimum": -999.2501221,
+      "maximum": 742.79785156,
+      "mean": 23.505068919760962,
+      "std": 22.632799530781753,
+      "example_values": [
+        8.8257350922,
+        8.6766319275,
+        8.5279178619,
+        8.3788127899,
+        8.2299041748,
+        8.0807991028,
+        7.9319849014,
+        8.1319131851,
+        8.7448225021,
+        9.361905098
+      ]
+    },
+    {
+      "name": "RXO",
+      "dtype": "float64",
+      "non_null": 327427,
+      "null_count": 843084,
+      "null_fraction": 0.72027,
+      "unique_count": null,
+      "minimum": -999.9000244,
+      "maximum": 35930.671875,
+      "mean": -95.77949612162365,
+      "std": 348.980029610622,
+      "example_values": [
+        0.2717624009,
+        0.2833407819,
+        0.2847625315,
+        0.3687536716,
+        0.3142674267,
+        0.2883481383,
+        0.2634341717,
+        0.2476460636,
+        0.3069671988,
+        0.3599761724
+      ]
+    },
+    {
+      "name": "FORCE_2020_LITHOFACIES_LITHOLOGY",
+      "dtype": "int64",
+      "non_null": 1170511,
+      "null_count": 0,
+      "null_fraction": 0.0,
+      "unique_count": null,
+      "minimum": 30000,
+      "maximum": 99000,
+      "mean": 61385.9759250447,
+      "std": 13891.702149430857,
+      "example_values": [
+        65000,
+        65000,
+        65000,
+        65000,
+        65000,
+        65000,
+        65000,
+        65000,
+        65000,
+        65000
+      ]
+    },
+    {
+      "name": "FORCE_2020_LITHOFACIES_CONFIDENCE",
+      "dtype": "float64",
+      "non_null": 1170332,
+      "null_count": 179,
+      "null_fraction": 0.000153,
+      "unique_count": null,
+      "minimum": 1.0,
+      "maximum": 3.0,
+      "mean": 1.1642576636373267,
+      "std": 0.4451180413109807,
+      "example_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "notes": [
+    "X_LOC/Y_LOC magnitudes are projected metres (North Sea UTM), not degrees. A CRS transform is required before these can be mapped."
+  ],
+  "extras": {
+    "wells": {
+      "count": 98,
+      "rows_per_well": {
+        "min": 1734,
+        "median": 12534,
+        "max": 25131
+      },
+      "names": [
+        "25/2-7",
+        "29/6-1",
+        "25/7-2",
+        "35/11-6",
+        "34/2-4",
+        "34/11-2 S",
+        "25/4-5",
+        "34/10-21",
+        "30/6-5",
+        "25/3-1",
+        "30/3-3",
+        "25/2-13 T4",
+        "35/4-1",
+        "34/10-35",
+        "17/11-1",
+        "26/4-1",
+        "35/11-12",
+        "31/2-8",
+        "25/5-1",
+        "15/9-13",
+        "34/8-1",
+        "33/9-17",
+        "15/9-15",
+        "16/10-1",
+        "15/9-17",
+        "33/9-1",
+        "31/2-19 S",
+        "7/1-1",
+        "16/10-3",
+        "25/2-14",
+        "25/9-1",
+        "16/7-5",
+        "35/11-1",
+        "16/11-1 ST3",
+        "25/8-5 S",
+        "34/5-1 A",
+        "35/8-6 S",
+        "16/4-1",
+        "31/4-5",
+        "34/8-3",
+        "31/3-1",
+        "34/7-20",
+        "35/12-1",
+        "35/9-6 S",
+        "35/11-7",
+        "25/5-4",
+        "35/11-11",
+        "33/6-3 S",
+        "34/10-19",
+        "34/7-21",
+        "35/9-2",
+        "25/6-3",
+        "31/3-3",
+        "31/5-4 S",
+        "31/6-5",
+        "31/3-2",
+        "16/2-11 A",
+        "16/2-16",
+        "16/7-4",
+        "31/6-8",
+        "34/12-1",
+        "16/2-6",
+        "25/8-7",
+        "31/2-9",
+        "31/4-10",
+        "31/2-1",
+        "31/2-7",
+        "34/8-7 R",
+        "25/11-19 S",
+        "16/8-1",
+        "25/6-1",
+        "35/11-10",
+        "34/10-33",
+        "31/3-4",
+        "35/3-7 S",
+        "25/11-5",
+        "35/9-5",
+        "30/3-5 S",
+        "35/9-10 S",
+        "34/11-1",
+        "33/5-2",
+        "34/7-13",
+        "34/4-10 R",
+        "36/7-3",
+        "16/1-6 A",
+        "32/2-1",
+        "16/5-3",
+        "25/6-2",
+        "16/10-5",
+        "35/8-4",
+        "35/11-15 S",
+        "16/10-2",
+        "35/11-13",
+        "25/11-15",
+        "34/5-1 S",
+        "34/3-1 A",
+        "7/1-2 S",
+        "16/1-2"
+      ]
+    },
+    "well_depth_ranges": {
+      "15/9-13": {
+        "depth_min_m": 494.528,
+        "depth_max_m": 3272.024,
+        "rows": 18270
+      },
+      "15/9-15": {
+        "depth_min_m": 485.256,
+        "depth_max_m": 3200.128,
+        "rows": 17717
+      },
+      "15/9-17": {
+        "depth_min_m": 472.43,
+        "depth_max_m": 3114.494,
+        "rows": 17350
+      },
+      "16/1-2": {
+        "depth_min_m": 2645.58,
+        "depth_max_m": 2908.996,
+        "rows": 1734
+      },
+      "16/1-6 A": {
+        "depth_min_m": 1175.98,
+        "depth_max_m": 1726.524,
+        "rows": 3623
+      },
+      "16/10-1": {
+        "depth_min_m": 439.416,
+        "depth_max_m": 3125.864,
+        "rows": 17675
+      },
+      "16/10-2": {
+        "depth_min_m": 2767.265,
+        "depth_max_m": 3137.537,
+        "rows": 2437
+      },
+      "16/10-3": {
+        "depth_min_m": 415.262,
+        "depth_max_m": 2840.422,
+        "rows": 15956
+      },
+      "16/10-5": {
+        "depth_min_m": 2607.004,
+        "depth_max_m": 3027.132,
+        "rows": 2765
+      },
+      "16/11-1 ST3": {
+        "depth_min_m": 682.913,
+        "depth_max_m": 2953.337,
+        "rows": 14938
+      },
+      "16/2-11 A": {
+        "depth_min_m": 734.419,
+        "depth_max_m": 2361.883,
+        "rows": 10708
+      },
+      "16/2-16": {
+        "depth_min_m": 684.27,
+        "depth_max_m": 2207.918,
+        "rows": 10025
+      },
+      "16/2-6": {
+        "depth_min_m": 735.187,
+        "depth_max_m": 2124.011,
+        "rows": 9138
+      },
+      "16/4-1": {
+        "depth_min_m": 760.89,
+        "depth_max_m": 2901.202,
+        "rows": 14082
+      },
+      "16/5-3": {
+        "depth_min_m": 1508.99,
+        "depth_max_m": 1968.79,
+        "rows": 3021
+      },
+      "16/7-4": {
+        "depth_min_m": 1244.38,
+        "depth_max_m": 2765.748,
+        "rows": 10010
+      },
+      "16/7-5": {
+        "depth_min_m": 446.472,
+        "depth_max_m": 2898.992,
+        "rows": 15590
+      },
+      "16/8-1": {
+        "depth_min_m": 1291.391,
+        "depth_max_m": 2307.359,
+        "rows": 6685
+      },
+      "17/11-1": {
+        "depth_min_m": 162.593,
+        "depth_max_m": 3238.465,
+        "rows": 20099
+      },
+      "25/11-15": {
+        "depth_min_m": 1650.088,
+        "depth_max_m": 1997.104,
+        "rows": 2284
+      },
+      "25/11-19 S": {
+        "depth_min_m": 984.412,
+        "depth_max_m": 2044.46,
+        "rows": 6975
+      },
+      "25/11-5": {
+        "depth_min_m": 1388.145,
+        "depth_max_m": 2157.113,
+        "rows": 5060
+      },
+      "25/2-13 T4": {
+        "depth_min_m": 694.808,
+        "depth_max_m": 3896.08,
+        "rows": 21062
+      },
+      "25/2-14": {
+        "depth_min_m": 1198.938,
+        "depth_max_m": 3621.514,
+        "rows": 15840
+      },
+      "25/2-7": {
+        "depth_min_m": 200.338,
+        "depth_max_m": 4020.098,
+        "rows": 25131
+      },
+      "25/3-1": {
+        "depth_min_m": 693.992,
+        "depth_max_m": 3914.112,
+        "rows": 21186
+      },
+      "25/4-5": {
+        "depth_min_m": 853.303,
+        "depth_max_m": 4349.911,
+        "rows": 23005
+      },
+      "25/5-1": {
+        "depth_min_m": 590.36,
+        "depth_max_m": 3415.128,
+        "rows": 18473
+      },
+      "25/5-4": {
+        "depth_min_m": 1199.728,
+        "depth_max_m": 3175.12,
+        "rows": 12997
+      },
+      "25/6-1": {
+        "depth_min_m": 1907.0,
+        "depth_max_m": 2850.616,
+        "rows": 6209
+      },
+      "25/6-2": {
+        "depth_min_m": 1924.616,
+        "depth_max_m": 2369.064,
+        "rows": 2925
+      },
+      "25/6-3": {
+        "depth_min_m": 626.324,
+        "depth_max_m": 2450.476,
+        "rows": 11985
+      },
+      "25/7-2": {
+        "depth_min_m": 1211.536,
+        "depth_max_m": 4840.992,
+        "rows": 23879
+      },
+      "25/8-5 S": {
+        "depth_min_m": 1165.798,
+        "depth_max_m": 3387.43,
+        "rows": 14596
+      },
+      "25/8-7": {
+        "depth_min_m": 1003.327,
+        "depth_max_m": 2371.023,
+        "rows": 8999
+      },
+      "25/9-1": {
+        "depth_min_m": 136.086,
+        "depth_max_m": 2528.87,
+        "rows": 15743
+      },
+      "26/4-1": {
+        "depth_min_m": 698.976,
+        "depth_max_m": 3674.528,
+        "rows": 19577
+      },
+      "29/6-1": {
+        "depth_min_m": 1099.585,
+        "depth_max_m": 4819.025,
+        "rows": 24464
+      },
+      "30/3-3": {
+        "depth_min_m": 201.062,
+        "depth_max_m": 3427.414,
+        "rows": 21163
+      },
+      "30/3-5 S": {
+        "depth_min_m": 3892.082,
+        "depth_max_m": 4561.034,
+        "rows": 4382
+      },
+      "30/6-5": {
+        "depth_min_m": 256.922,
+        "depth_max_m": 3547.874,
+        "rows": 21636
+      },
+      "31/2-1": {
+        "depth_min_m": 1164.852,
+        "depth_max_m": 2422.348,
+        "rows": 8274
+      },
+      "31/2-19 S": {
+        "depth_min_m": 1537.278,
+        "depth_max_m": 4076.286,
+        "rows": 16455
+      },
+      "31/2-7": {
+        "depth_min_m": 439.641,
+        "depth_max_m": 1656.097,
+        "rows": 8004
+      },
+      "31/2-8": {
+        "depth_min_m": 480.605,
+        "depth_max_m": 3379.853,
+        "rows": 19025
+      },
+      "31/2-9": {
+        "depth_min_m": 443.697,
+        "depth_max_m": 1765.793,
+        "rows": 8699
+      },
+      "31/3-1": {
+        "depth_min_m": 349.733,
+        "depth_max_m": 2362.365,
+        "rows": 13236
+      },
+      "31/3-2": {
+        "depth_min_m": 433.545,
+        "depth_max_m": 2082.897,
+        "rows": 10750
+      },
+      "31/3-3": {
+        "depth_min_m": 793.762,
+        "depth_max_m": 2562.434,
+        "rows": 11624
+      },
+      "31/3-4": {
+        "depth_min_m": 1288.002,
+        "depth_max_m": 2115.186,
+        "rows": 5377
+      },
+      "31/4-10": {
+        "depth_min_m": 997.996,
+        "depth_max_m": 2317.052,
+        "rows": 8679
+      },
+      "31/4-5": {
+        "depth_min_m": 895.101,
+        "depth_max_m": 2925.669,
+        "rows": 13352
+      },
+      "31/5-4 S": {
+        "depth_min_m": 164.942,
+        "depth_max_m": 1884.518,
+        "rows": 11314
+      },
+      "31/6-5": {
+        "depth_min_m": 387.631,
+        "depth_max_m": 2074.375,
+        "rows": 11098
+      },
+      "31/6-8": {
+        "depth_min_m": 688.084,
+        "depth_max_m": 2137.708,
+        "rows": 9531
+      },
+      "32/2-1": {
+        "depth_min_m": 830.204,
+        "depth_max_m": 1294.108,
+        "rows": 3049
+      },
+      "33/5-2": {
+        "depth_min_m": 3900.56,
+        "depth_max_m": 4522.24,
+        "rows": 4091
+      },
+      "33/6-3 S": {
+        "depth_min_m": 2484.169,
+        "depth_max_m": 4422.017,
+        "rows": 12681
+      },
+      "33/9-1": {
+        "depth_min_m": 488.77,
+        "depth_max_m": 3118.218,
+        "rows": 17278
+      },
+      "33/9-17": {
+        "depth_min_m": 515.594,
+        "depth_max_m": 3208.578,
+        "rows": 17718
+      },
+      "34/10-19": {
+        "depth_min_m": 291.104,
+        "depth_max_m": 2212.84,
+        "rows": 12644
+      },
+      "34/10-21": {
+        "depth_min_m": 587.058,
+        "depth_max_m": 4005.538,
+        "rows": 22491
+      },
+      "34/10-33": {
+        "depth_min_m": 2958.272,
+        "depth_max_m": 3877.112,
+        "rows": 6046
+      },
+      "34/10-35": {
+        "depth_min_m": 1051.623,
+        "depth_max_m": 4308.375,
+        "rows": 20619
+      },
+      "34/11-1": {
+        "depth_min_m": 3922.115,
+        "depth_max_m": 4564.315,
+        "rows": 4226
+      },
+      "34/11-2 S": {
+        "depth_min_m": 1160.304,
+        "depth_max_m": 4738.992,
+        "rows": 23310
+      },
+      "34/12-1": {
+        "depth_min_m": 3166.95,
+        "depth_max_m": 4692.726,
+        "rows": 9350
+      },
+      "34/2-4": {
+        "depth_min_m": 523.729,
+        "depth_max_m": 4103.785,
+        "rows": 23403
+      },
+      "34/3-1 A": {
+        "depth_min_m": 3771.401,
+        "depth_max_m": 4146.537,
+        "rows": 2251
+      },
+      "34/4-10 R": {
+        "depth_min_m": 3632.002,
+        "depth_max_m": 4240.458,
+        "rows": 3880
+      },
+      "34/5-1 A": {
+        "depth_min_m": 2119.706,
+        "depth_max_m": 4393.474,
+        "rows": 14592
+      },
+      "34/5-1 S": {
+        "depth_min_m": 3544.25,
+        "depth_max_m": 3898.714,
+        "rows": 2273
+      },
+      "34/7-13": {
+        "depth_min_m": 2383.329,
+        "depth_max_m": 2975.977,
+        "rows": 3900
+      },
+      "34/7-20": {
+        "depth_min_m": 1156.342,
+        "depth_max_m": 3166.542,
+        "rows": 13157
+      },
+      "34/7-21": {
+        "depth_min_m": 1061.366,
+        "depth_max_m": 2971.246,
+        "rows": 12424
+      },
+      "34/8-1": {
+        "depth_min_m": 891.137,
+        "depth_max_m": 3608.289,
+        "rows": 17877
+      },
+      "34/8-3": {
+        "depth_min_m": 1276.104,
+        "depth_max_m": 3315.184,
+        "rows": 13341
+      },
+      "34/8-7 R": {
+        "depth_min_m": 4360.016,
+        "depth_max_m": 5436.632,
+        "rows": 7084
+      },
+      "35/11-1": {
+        "depth_min_m": 989.057,
+        "depth_max_m": 3357.673,
+        "rows": 15584
+      },
+      "35/11-10": {
+        "depth_min_m": 1942.312,
+        "depth_max_m": 2885.472,
+        "rows": 6206
+      },
+      "35/11-11": {
+        "depth_min_m": 1245.172,
+        "depth_max_m": 3214.788,
+        "rows": 12844
+      },
+      "35/11-12": {
+        "depth_min_m": 388.546,
+        "depth_max_m": 3339.93,
+        "rows": 19112
+      },
+      "35/11-13": {
+        "depth_min_m": 2901.678,
+        "depth_max_m": 3270.886,
+        "rows": 2430
+      },
+      "35/11-15 S": {
+        "depth_min_m": 2818.088,
+        "depth_max_m": 3212.528,
+        "rows": 2596
+      },
+      "35/11-6": {
+        "depth_min_m": 391.208,
+        "depth_max_m": 3969.744,
+        "rows": 23544
+      },
+      "35/11-7": {
+        "depth_min_m": 890.846,
+        "depth_max_m": 2873.686,
+        "rows": 13005
+      },
+      "35/12-1": {
+        "depth_min_m": 998.575,
+        "depth_max_m": 3002.239,
+        "rows": 13125
+      },
+      "35/3-7 S": {
+        "depth_min_m": 3245.636,
+        "depth_max_m": 4018.708,
+        "rows": 5087
+      },
+      "35/4-1": {
+        "depth_min_m": 1335.364,
+        "depth_max_m": 4932.596,
+        "rows": 20823
+      },
+      "35/8-4": {
+        "depth_min_m": 3279.256,
+        "depth_max_m": 3690.872,
+        "rows": 2709
+      },
+      "35/8-6 S": {
+        "depth_min_m": 1821.431,
+        "depth_max_m": 4006.735,
+        "rows": 14378
+      },
+      "35/9-10 S": {
+        "depth_min_m": 2950.022,
+        "depth_max_m": 3605.446,
+        "rows": 4313
+      },
+      "35/9-2": {
+        "depth_min_m": 1005.688,
+        "depth_max_m": 2877.112,
+        "rows": 12313
+      },
+      "35/9-5": {
+        "depth_min_m": 2726.168,
+        "depth_max_m": 3477.2,
+        "rows": 4942
+      },
+      "35/9-6 S": {
+        "depth_min_m": 1725.152,
+        "depth_max_m": 3745.536,
+        "rows": 13094
+      },
+      "36/7-3": {
+        "depth_min_m": 2391.104,
+        "depth_max_m": 2948.184,
+        "rows": 3628
+      },
+      "7/1-1": {
+        "depth_min_m": 334.313,
+        "depth_max_m": 2802.793,
+        "rows": 16241
+      },
+      "7/1-2 S": {
+        "depth_min_m": 2859.992,
+        "depth_max_m": 3169.92,
+        "rows": 2040
+      }
+    },
+    "curve_coverage": {
+      "DEPTH_MD": 1.0,
+      "GR": 1.0,
+      "FORCE_2020_LITHOFACIES_LITHOLOGY": 1.0,
+      "FORCE_2020_LITHOFACIES_CONFIDENCE": 0.999847,
+      "X_LOC": 0.990795,
+      "Y_LOC": 0.990795,
+      "Z_LOC": 0.990795,
+      "RDEP": 0.99059,
+      "RMED": 0.966687,
+      "DTC": 0.930916,
+      "CALI": 0.924924,
+      "RHOB": 0.862223,
+      "DRHO": 0.843954,
+      "SP": 0.73835,
+      "NPHI": 0.65391,
+      "BS": 0.583213,
+      "PEF": 0.573845,
+      "RSHA": 0.538782,
+      "ROP": 0.457126,
+      "RXO": 0.27973,
+      "MUDWEIGHT": 0.270097,
+      "DCAL": 0.255301,
+      "ROPA": 0.164309,
+      "RMIC": 0.150498,
+      "DTS": 0.149177,
+      "SGR": 0.05925
+    },
+    "curves_meeting_coverage_threshold": {
+      "threshold": 0.3,
+      "curves": [
+        "DEPTH_MD",
+        "X_LOC",
+        "Y_LOC",
+        "Z_LOC",
+        "CALI",
+        "RSHA",
+        "RMED",
+        "RDEP",
+        "RHOB",
+        "GR",
+        "NPHI",
+        "PEF",
+        "DTC",
+        "SP",
+        "BS",
+        "ROP",
+        "DRHO",
+        "FORCE_2020_LITHOFACIES_LITHOLOGY",
+        "FORCE_2020_LITHOFACIES_CONFIDENCE"
+      ]
+    },
+    "curve_well_presence": {
+      "DEPTH_MD": 98,
+      "X_LOC": 98,
+      "Y_LOC": 98,
+      "Z_LOC": 98,
+      "RDEP": 98,
+      "RHOB": 98,
+      "GR": 98,
+      "NPHI": 98,
+      "DTC": 98,
+      "FORCE_2020_LITHOFACIES_LITHOLOGY": 98,
+      "FORCE_2020_LITHOFACIES_CONFIDENCE": 98,
+      "CALI": 97,
+      "RMED": 97,
+      "DRHO": 95,
+      "RSHA": 74,
+      "PEF": 69,
+      "BS": 69,
+      "SP": 68,
+      "ROP": 53,
+      "RXO": 38,
+      "DTS": 32,
+      "MUDWEIGHT": 28,
+      "RMIC": 27,
+      "ROPA": 25,
+      "DCAL": 22,
+      "SGR": 13
+    },
+    "target": {
+      "column": "FORCE_2020_LITHOFACIES_LITHOLOGY",
+      "class_count": 12,
+      "distribution": [
+        {
+          "code": 65000,
+          "name": "Shale",
+          "rows": 720803,
+          "fraction": 0.615802
+        },
+        {
+          "code": 30000,
+          "name": "Sandstone",
+          "rows": 168937,
+          "fraction": 0.144328
+        },
+        {
+          "code": 65030,
+          "name": "Sandstone/Shale",
+          "rows": 150455,
+          "fraction": 0.128538
+        },
+        {
+          "code": 70000,
+          "name": "Limestone",
+          "rows": 56320,
+          "fraction": 0.048116
+        },
+        {
+          "code": 80000,
+          "name": "Marl",
+          "rows": 33329,
+          "fraction": 0.028474
+        },
+        {
+          "code": 99000,
+          "name": "Tuff",
+          "rows": 15245,
+          "fraction": 0.013024
+        },
+        {
+          "code": 70032,
+          "name": "Chalk",
+          "rows": 10513,
+          "fraction": 0.008982
+        },
+        {
+          "code": 88000,
+          "name": "Halite",
+          "rows": 8213,
+          "fraction": 0.007017
+        },
+        {
+          "code": 90000,
+          "name": "Coal",
+          "rows": 3820,
+          "fraction": 0.003264
+        },
+        {
+          "code": 74000,
+          "name": "Dolomite",
+          "rows": 1688,
+          "fraction": 0.001442
+        },
+        {
+          "code": 86000,
+          "name": "Anhydrite",
+          "rows": 1085,
+          "fraction": 0.000927
+        },
+        {
+          "code": 93000,
+          "name": "Basement",
+          "rows": 103,
+          "fraction": 8.8e-05
+        }
+      ],
+      "imbalance_ratio": 6998.09
+    },
+    "duplicate_well_depth_rows": {
+      "count": 0,
+      "fraction": 0.0
+    },
+    "wells_with_non_monotonic_depth": [],
+    "coordinates": {
+      "X_LOC": {
+        "min": 426898.781,
+        "max": 572632.75,
+        "null_fraction": 0.009205
+      },
+      "Y_LOC": {
+        "min": 6406641.0,
+        "max": 6856661.0,
+        "null_fraction": 0.009205
+      },
+      "Z_LOC": {
+        "min": -5395.563,
+        "max": -111.086,
+        "null_fraction": 0.009205
+      }
+    },
+    "group_values": {
+      "distinct": 14,
+      "null_fraction": 0.001092,
+      "top": [
+        {
+          "value": "HORDALAND GP.",
+          "rows": 293155
+        },
+        {
+          "value": "SHETLAND GP.",
+          "rows": 234028
+        },
+        {
+          "value": "VIKING GP.",
+          "rows": 131999
+        },
+        {
+          "value": "ROGALAND GP.",
+          "rows": 131944
+        },
+        {
+          "value": "DUNLIN GP.",
+          "rows": 119085
+        },
+        {
+          "value": "NORDLAND GP.",
+          "rows": 111490
+        },
+        {
+          "value": "CROMER KNOLL GP.",
+          "rows": 52320
+        },
+        {
+          "value": "BAAT GP.",
+          "rows": 35823
+        },
+        {
+          "value": "VESTLAND GP.",
+          "rows": 26116
+        },
+        {
+          "value": "HEGRE GP.",
+          "rows": 13913
+        },
+        {
+          "value": "ZECHSTEIN GP.",
+          "rows": 12238
+        },
+        {
+          "value": "BOKNFJORD GP.",
+          "rows": 3125
+        },
+        {
+          "value": "ROTLIEGENDES GP.",
+          "rows": 2792
+        },
+        {
+          "value": "TYNE GP.",
+          "rows": 1205
+        }
+      ]
+    },
+    "formation_values": {
+      "distinct": 69,
+      "null_fraction": 0.117038,
+      "top": [
+        {
+          "value": "Utsira Fm.",
+          "rows": 172636
+        },
+        {
+          "value": "Kyrre Fm.",
+          "rows": 94328
+        },
+        {
+          "value": "Lista Fm.",
+          "rows": 71080
+        },
+        {
+          "value": "Heather Fm.",
+          "rows": 65041
+        },
+        {
+          "value": "Skade Fm.",
+          "rows": 45983
+        },
+        {
+          "value": "Statfjord Fm.",
+          "rows": 36028
+        },
+        {
+          "value": "Vaale Fm.",
+          "rows": 35443
+        },
+        {
+          "value": "Jorsalfare Fm.",
+          "rows": 26351
+        },
+        {
+          "value": "Grid Fm.",
+          "rows": 26020
+        },
+        {
+          "value": "Balder Fm.",
+          "rows": 25814
+        },
+        {
+          "value": "Sele Fm.",
+          "rows": 25451
+        },
+        {
+          "value": "Smith Bank Fm.",
+          "rows": 25331
+        },
+        {
+          "value": "Drake Fm.",
+          "rows": 24986
+        },
+        {
+          "value": "Draupne Fm.",
+          "rows": 24961
+        },
+        {
+          "value": "Amundsen Fm.",
+          "rows": 23749
+        },
+        {
+          "value": "Tryggvason Fm.",
+          "rows": 18800
+        },
+        {
+          "value": "Cook Fm.",
+          "rows": 17896
+        },
+        {
+          "value": "Roedby Fm.",
+          "rows": 17462
+        },
+        {
+          "value": "Sleipner Fm.",
+          "rows": 16172
+        },
+        {
+          "value": "Fensfjord Fm.",
+          "rows": 15361
+        },
+        {
+          "value": "Skagerrak Fm.",
+          "rows": 15232
+        },
+        {
+          "value": "Svarte Fm.",
+          "rows": 15215
+        },
+        {
+          "value": "Aasgard Fm.",
+          "rows": 14817
+        },
+        {
+          "value": "Hardraade Fm.",
+          "rows": 13576
+        },
+        {
+          "value": "Tor Fm.",
+          "rows": 13525
+        },
+        {
+          "value": "Sognefjord Fm.",
+          "rows": 13493
+        },
+        {
+          "value": "Ness Fm.",
+          "rows": 12250
+        },
+        {
+          "value": "Hod Fm.",
+          "rows": 11862
+        },
+        {
+          "value": "Grid Mb.",
+          "rows": 11236
+        },
+        {
+          "value": "Skade Mb.",
+          "rows": 10344
+        }
+      ]
+    }
+  }
+}

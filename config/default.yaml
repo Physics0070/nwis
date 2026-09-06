@@ -1,0 +1,232 @@
+# NWIS base configuration.
+# Every tunable value in the system lives here or in an environment override.
+# No thresholds, weights, window sizes or K values may be hardcoded in application code.
+
+app:
+  name: "NWIS — Nearby Wells Intelligence System"
+  environment: "development"
+
+logging:
+  level: "INFO"
+  format: "json"          # json | console
+  sql_echo: false
+
+database:
+  # Real target stack. DATABASE_URL env var overrides this entirely.
+  url: "postgresql+psycopg://nwis:nwis@localhost:5432/nwis"
+  # Local fallback used when the Postgres stack is unavailable (see docs/ASSUMPTIONS.md).
+  fallback_url: "sqlite+pysqlite:///./data/nwis.db"
+  allow_fallback: true
+  pool_size: 5
+  max_overflow: 10
+  statement_timeout_seconds: 30
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  root_path: ""
+  cors_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+  default_page_size: 50
+  max_page_size: 500
+
+paths:
+  data_raw: "data/raw"
+  data_interim: "data/interim"
+  data_processed: "data/processed"
+  data_external: "data/external"
+  artifacts: "artifacts"
+  models: "artifacts/models"
+
+datasets:
+  force:
+    # Official FORCE 2020 lithology competition data.
+    source_repo: "https://github.com/bolgebrygg/Force-2020-Machine-Learning-competition"
+    raw_dir: "data/raw/force2020"
+    files:
+      train_zip: "https://github.com/bolgebrygg/Force-2020-Machine-Learning-competition/raw/master/lithology_competition/data/train.zip"
+      test_features: "https://github.com/bolgebrygg/Force-2020-Machine-Learning-competition/raw/master/lithology_competition/data/leaderboard_test_features.csv"
+      test_target: "https://github.com/bolgebrygg/Force-2020-Machine-Learning-competition/raw/master/lithology_competition/data/leaderboard_test_target.csv"
+      penalty_matrix: "https://github.com/bolgebrygg/Force-2020-Machine-Learning-competition/raw/master/lithology_competition/data/penalty_matrix.npy"
+    csv_separator: ";"
+  volve:
+    # Public Volve WITSML mirror (Equinor open data licence).
+    source_repo: "https://github.com/f0nzie/volve-drilling"
+    raw_dir: "data/raw/volve"
+    witsml_subdir: "witsml"
+  npd:
+    # Norwegian Offshore Directorate factpages — public wellbore coordinates.
+    wellbore_csv: "https://factpages.sodir.no/public?/Factpages/external/tableview/wellbore_exploration_all&rs:Command=Render&rc:Toolbar=false&rc:Parameters=f&IpAddress=1.1.1.1&CultureCode=en&rs:Format=CSV"
+    raw_dir: "data/raw/npd"
+
+profiling:
+  max_example_values: 10
+  missingness_report_top_n: 40
+
+data_quality:
+  # Physically implausible readings are flagged (never silently dropped).
+  null_sentinels: [-999.25, -999.0, -9999.0]
+  depth_monotonic_tolerance_m: 0.5
+  max_duplicate_depth_fraction: 0.02
+  coordinate_bounds:
+    lat_min: -90.0
+    lat_max: 90.0
+    lon_min: -180.0
+    lon_max: 180.0
+
+force_pipeline:
+  # Column names are resolved from the profiling report at runtime, never assumed.
+  target_column: "FORCE_2020_LITHOFACIES_LITHOLOGY"
+  well_column: "WELL"
+  depth_column: "DEPTH_MD"
+  group_column: "GROUP"
+  formation_column: "FORMATION"
+  min_rows_per_well: 100
+  min_curve_coverage: 0.30      # a curve is usable if present in >= this fraction of rows
+
+  # Columns that must never become model features.
+  #   *_LITHOFACIES_*  : the label and its annotation-confidence flag (leakage)
+  #   X_LOC / Y_LOC    : absolute map position. Including them lets the model memorise
+  #                      geography instead of petrophysics — scores inflate on nearby
+  #                      wells and collapse on new areas. Z_LOC (true vertical depth)
+  #                      is retained because depth is genuine petrophysical context.
+  excluded_features:
+    - "FORCE_2020_LITHOFACIES_LITHOLOGY"
+    - "FORCE_2020_LITHOFACIES_CONFIDENCE"
+    - "X_LOC"
+    - "Y_LOC"
+
+  # CRS of X_LOC/Y_LOC: Norwegian North Sea sector, ED50 / UTM zone 31N.
+  # Transformed to WGS84 before any value reaches the map.
+  source_crs: "EPSG:23031"
+  target_crs: "EPSG:4326"
+
+  split:
+    strategy: "well_level"      # rows of a well never cross splits
+    train_fraction: 0.70
+    validation_fraction: 0.15
+    test_fraction: 0.15
+    random_seed: 42
+    # Rare lithologies occur in very few wells (Basement: 103 rows dataset-wide).
+    # Greedily place scarce-class wells first so each split keeps what coverage exists.
+    stratify_by_class_presence: true
+    # Only classes appearing in this many wells or fewer are actively spread across
+    # splits. Common lithologies reach every split unaided; forcing them would
+    # override the split sizes above.
+    rare_class_max_wells: 15
+  features:
+    depth_derived: true
+    rolling_windows_m: [5.0, 15.0]
+    rolling_statistics: ["mean", "std"]
+    gradient: true
+
+lithology_model:
+  candidates: ["random_forest", "xgboost"]
+  random_forest:
+    n_estimators: 300
+    max_depth: 20
+    min_samples_leaf: 5
+    class_weight: "balanced_subsample"
+    n_jobs: -1
+    random_state: 42
+  xgboost:
+    n_estimators: 400
+    max_depth: 8
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+  min_class_support: 50         # classes below this are reported separately, not dropped silently
+
+volve_pipeline:
+  # Log objects to ingest, resolved against what the WITSML files actually contain.
+  preferred_log_names: ["GenTime", "GwdTime", "GenTime2", "Hydraulics"]
+  resample_seconds: 10
+  min_valid_fraction: 0.10
+  unit_conversions:
+    enabled: true
+
+telemetry:
+  # Rolling windows expressed in samples at the resampled rate above.
+  rolling_windows:
+    short: 6
+    medium: 30
+    long: 90
+  statistics: ["mean", "std", "slope"]
+  rate_of_change: true
+  min_samples_for_features: 90
+
+anomaly:
+  model: "isolation_forest"
+  isolation_forest:
+    n_estimators: 200
+    contamination: 0.02
+    max_samples: "auto"
+    random_state: 42
+  score_smoothing_window: 5
+  attribution_top_n: 5
+
+analogue:
+  top_k: 5
+  candidate_pool: 50
+  embedding_dim: 32
+  weights:
+    geology: 0.30
+    formation: 0.20
+    depth: 0.15
+    drilling_behaviour: 0.20
+    geography: 0.15
+  geography:
+    search_radius_km: 50.0
+    distance_decay_km: 25.0
+  depth:
+    tolerance_m: 300.0
+
+risk:
+  mode: "auto"                  # auto | supervised | hybrid_indicator
+  min_labelled_events_for_supervised: 200
+  weights:
+    anomaly: 0.40
+    historical_evidence: 0.40
+    rules: 0.20
+  lookahead_m: 150.0            # distance ahead of bit to consider historical intervals
+  evidence:
+    min_analogue_similarity: 0.50
+    min_supporting_wells: 1
+
+alerts:
+  thresholds:                   # applied to combined risk score in [0, 1]
+    INFO: 0.0
+    LOW: 0.25
+    MEDIUM: 0.45
+    HIGH: 0.65
+    CRITICAL: 0.85
+  cooldown_seconds: 300
+  dedupe_depth_window_m: 25.0
+  max_active_alerts_per_well: 20
+
+replay:
+  default_speed: 60.0           # simulated seconds per wall-clock second
+  min_speed: 1.0
+  max_speed: 3600.0
+  tick_interval_seconds: 1.0
+  autostart: false
+
+embeddings:
+  text_model: "sentence-transformers/all-MiniLM-L6-v2"
+  enabled: true
+  batch_size: 32
+
+documents:
+  ocr:
+    enabled: true
+    tesseract_cmd: null         # null = use PATH
+    language: "eng"
+    dpi: 300
+  nlp:
+    spacy_model: "en_core_web_sm"
+    min_confidence: 0.35
+  chunk:
+    size_chars: 1200
+    overlap_chars: 150

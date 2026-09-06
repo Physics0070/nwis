@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Secrets — never commit
+.env
+.env.local
+*.pem
+*.key
+
+# Data & artifacts (regenerate via scripts/, never commit)
+data/raw/
+data/interim/
+data/processed/
+data/external/
+data/*.db
+artifacts/models/*
+!artifacts/models/.gitkeep
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Pre-existing submission binaries kept on disk but out of version control
+*.pptx
+*.xlsx

@@ -1,0 +1,150 @@
+# NWIS — Build Checklist
+
+Living progress tracker. Status legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked/assumption recorded.
+
+Last updated: 2026-09-06 (session 1)
+
+---
+
+## Phase 0 — Repository & environment inspection
+
+- [x] Inspect machine for existing NWIS code, Stitch assets, datasets
+- [x] Read SIH 2026 idea submission (PS 26121, Team 53476) to ground scope
+- [x] Confirm toolchain: Python 3.12, Node 25, git, network access
+- [x] Confirm FORCE 2020 reachable (train.zip + labelled leaderboard test set)
+- [x] Confirm Volve WITSML reachable (3 wells: F-4, F-7, F-9)
+- [x] Profile Volve WITSML object types and real curve mnemonics
+- [x] Create repository skeleton
+- [x] Record environment assumptions in `docs/ASSUMPTIONS.md`
+
+## Phase 1 — Repository, configuration, database, Docker
+
+- [x] Centralised configuration (`config/*.yaml` + `.env.example`), zero magic numbers
+- [x] Structured logging
+- [ ] SQLAlchemy models: wells, locations, trajectories, logs, formations,
+      lithology_predictions, telemetry, events, risk, alerts, mitigations,
+      embeddings, documents, knowledge, engineer_actions, model_versions
+- [ ] Alembic migrations
+- [ ] Storage adapter layer (PostGIS / pgvector / Timescale, with documented local fallback)
+- [ ] `docker-compose.yml` (postgres+postgis+timescale+pgvector, backend, frontend)
+- [ ] Database bring-up verified
+
+## Phase 2 — Dataset acquisition & profiling
+
+- [x] Reproducible download scripts (FORCE, Volve, NPD coordinates)
+- [x] FORCE profiling report (wells, curves, missingness, class balance, depth ranges)
+- [ ] Volve WITSML profiling report (logs, curves, units, time/depth coverage)
+- [ ] Data-quality validation rules + report
+
+## Phase 3 — FORCE preprocessing
+
+- [x] Configurable preprocessing pipeline (raw → cleaned → processed → features)
+- [x] Well-level train/val/test split manifest
+
+## Phase 4 — FORCE lithology model
+
+- [ ] Random Forest baseline
+- [ ] XGBoost
+- [ ] Evaluation on unseen wells (accuracy, macro/weighted F1, per-class, confusion matrix)
+- [ ] Model registry entry + metrics persisted (no invented numbers)
+- [ ] MODEL_CARD entry
+
+## Phase 5 — Volve preprocessing
+
+- [ ] WITSML parser (log, trajectory, message, bhaRun, wbGeometry, wellInfo)
+- [ ] Normalised telemetry schema + unit conversion
+- [ ] Cleaned/aligned telemetry dataset
+
+## Phase 6 — Telemetry feature engineering
+
+- [ ] Configurable rolling/derivative features
+- [ ] Feature spec documented
+
+## Phase 7 — Anomaly detection
+
+- [ ] Isolation Forest training + evaluation
+- [ ] Contributing-feature attribution
+- [ ] Persisted anomaly results
+
+## Phase 8 — Contextual analogue engine
+
+- [ ] Well/segment feature representation + embeddings
+- [ ] Vector similarity search
+- [ ] Transparent weighted re-ranking (weights in config)
+- [ ] Top-K configurable
+
+## Phase 9 — Historical event intelligence
+
+- [ ] Event extraction from WITSML messages
+- [ ] Event → depth interval → formation linkage
+- [ ] Evidence traceability to source records
+
+## Phase 10 — Risk engine
+
+- [ ] Label sufficiency assessment (supervised vs. hybrid indicator)
+- [ ] Risk scoring combining anomaly + analogue evidence + rules
+- [ ] Explainability payload
+
+## Phase 11 — OCR / NLP knowledge ingestion
+
+- [ ] Document ingestion pipeline
+- [ ] Entity/event extraction with provenance + confidence
+- [ ] Knowledge records persisted
+
+## Phase 12 — Telemetry replay engine
+
+- [ ] Replay from real cleaned telemetry (start/pause/resume/stop/speed)
+- [ ] Backend-owned replay state
+
+## Phase 13 — FastAPI integration
+
+- [ ] REST endpoints (wells, nearby, analogues, events, telemetry, lithology, risk, alerts, mitigations, models, actions)
+- [ ] OpenAPI docs
+- [ ] Error handling + graceful degradation states
+
+## Phase 14 — Frontend
+
+- [ ] Vite + React + TS + Tailwind scaffold
+- [ ] Design system (Stitch assets pending — see ASSUMPTIONS)
+- [ ] Pages: Overview, Active Well, Map, Analogues, Events, Telemetry, Alerts,
+      Alert Explanation, Mitigations, Model Insights, Engineer Actions
+- [ ] Every value API-driven, loading/empty/error states
+
+## Phase 15 — Real-time WebSocket
+
+- [ ] `/ws/telemetry/{well_id}` streaming
+- [ ] Live anomaly/risk overlay
+
+## Phase 16 — Feedback loop
+
+- [ ] Engineer action capture → institutional memory
+
+## Phase 17 — Testing
+
+- [ ] Backend: pipeline, ML, analogue, risk, API tests
+- [ ] Frontend: critical component tests
+
+## Phase 18 — Docs & Docker demo
+
+- [ ] README, ARCHITECTURE, DATA_PIPELINE, ML, API, SETUP, DEMO, MODEL_CARD
+- [ ] `docker compose up --build` verified
+
+---
+
+## Progress log
+
+| Phase | Result (measured, not estimated) |
+|---|---|
+| Datasets acquired | FORCE 389 MB (1,170,511 rows / 98 wells / 12 classes) + Volve 200 MB (781,558 telemetry rows / 3 wells / 79 curves) |
+| FORCE profiled | 0 duplicate (well,depth) rows, 0 non-monotonic wells, 19 curves >= 30% coverage, imbalance 6,998:1 |
+| FORCE prepared | 15 base curves -> 90 features (rolling 5 m / 15 m mean+std, gradients); depth sampling measured at 0.152 m |
+| Well-level split | 68 train / 15 validation / 15 test wells. Only Basement (1 well dataset-wide) cannot reach val/test |
+| External holdout | FORCE leaderboard set: 136,786 rows across 10 wells absent from training |
+
+## Open items / risks
+
+- **Stitch UI not present on disk.** Building an API-driven component architecture with a
+  neutral NWIS design system; Stitch styling can be swapped in without touching data flow.
+- **Docker & PostgreSQL not installed on this machine** (no WSL2). Compose stack is authored
+  for the real Postgres+PostGIS+Timescale+pgvector target; local verification requires Docker.
+- **Volve WITSML surface coordinates are zeroed** — ingesting from public NPD factpages.
