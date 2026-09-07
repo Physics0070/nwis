@@ -19,7 +19,11 @@ data/interim/
 data/processed/
 data/external/
 data/*.db
+data/*.db-shm
+data/*.db-wal
 artifacts/models/*
+# Verification screenshots are regenerated on demand
+artifacts/screenshots/
 !artifacts/models/.gitkeep
 
 # Node / frontend

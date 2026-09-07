@@ -28,9 +28,14 @@ api:
   host: "0.0.0.0"
   port: 8000
   root_path: ""
+  # Development origins only. In production the SPA is served from the same origin
+  # through the nginx proxy, so config/production.yaml sets this to an empty list and
+  # no cross-origin request is made at all.
   cors_origins:
-    - "http://localhost:5173"
+    - "http://localhost:5173"      # vite dev
     - "http://127.0.0.1:5173"
+    - "http://localhost:4173"      # vite preview (production bundle, run locally)
+    - "http://127.0.0.1:4173"
   default_page_size: 50
   max_page_size: 500
 
