@@ -182,6 +182,11 @@ class RiskAssessmentOut(BaseModel):
     )
     score: float
     risk_level: str
+    evaluated: bool = Field(
+        True,
+        description="False when no component could be computed. The score is then "
+                    "meaningless and must not be displayed as a risk level.",
+    )
     probability: float | None = Field(
         None,
         description="Populated only by a calibrated supervised model. Null under "

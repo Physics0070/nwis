@@ -224,9 +224,11 @@ export default function ActiveWell() {
         />
         <Metric
           label="Risk indicator"
-          value={risk.data ? risk.data.risk_level : null}
-          hint={risk.data ? `score ${formatNumber(risk.data.score, 3)}` : undefined}
-          unavailableReason="Not evaluated"
+          value={risk.data?.evaluated ? risk.data.risk_level : null}
+          hint={
+            risk.data?.evaluated ? `score ${formatNumber(risk.data.score, 3)}` : undefined
+          }
+          unavailableReason="Not evaluated at this depth"
         />
         <Metric
           label="Replay position"
@@ -311,7 +313,13 @@ export default function ActiveWell() {
           <Panel title="Risk state" subtitle="Evaluated at the current bit depth">
             {risk.isLoading && <Loading />}
             {risk.isError && <ErrorState error={risk.error} onRetry={risk.refetch} />}
-            {risk.data && (
+            {risk.data && !risk.data.evaluated && (
+              <Unavailable
+                reason="Risk could not be evaluated at this depth."
+                hint="No anomaly score, no historical evidence within the look-ahead window, and no measurements to apply rules to. That is an absence of signal, not a low risk."
+              />
+            )}
+            {risk.data?.evaluated && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <LevelBadge level={risk.data.risk_level} />

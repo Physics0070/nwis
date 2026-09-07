@@ -250,3 +250,34 @@ def test_classification_metrics_marks_low_support_classes():
     )
     assert "Basement" in metrics["classes_below_min_support"]["classes"]
     assert metrics["macro_f1"] < metrics["accuracy"]
+
+
+def test_unevaluable_risk_is_flagged_not_scored_as_zero():
+    """A score of 0.0 classified as INFO reads as "assessed, and it is fine".
+
+    When no component can be computed — no telemetry, no historical evidence in range, no
+    measurements — the honest answer is that risk is not evaluable at this depth. This is
+    the same rule the rest of the system follows: never a zero where the value is unknown.
+    """
+    from backend.app.core.database import session_scope
+    from backend.app.models import Well
+    from backend.app.services.risk import assess
+
+    session = session_scope()
+    try:
+        well = session.query(Well).filter(Well.has_logs.is_(True)).first()
+        if well is None:
+            pytest.skip("knowledge base is empty")
+
+        # A depth far below anything recorded: nothing can contribute.
+        empty = assess(session, well=well, depth_m=9000, anomaly_score=None)
+        assert empty.components == []
+        assert empty.evaluated is False
+        assert any("could not be evaluated" in n for n in empty.notes)
+
+        # A depth with real evidence still evaluates normally.
+        real = assess(session, well=well, depth_m=2500, anomaly_score=None)
+        if real.components:
+            assert real.evaluated is True
+    finally:
+        session.close()

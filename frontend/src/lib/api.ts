@@ -196,6 +196,11 @@ export interface RiskAssessment {
   mode: string;
   score: number;
   risk_level: string;
+  /**
+   * False when not one component could be computed. `score` is meaningless then and must
+   * not be rendered — a 0 classified as INFO reads as "assessed, and it is fine".
+   */
+  evaluated: boolean;
   /** Null under hybrid_indicator mode by design — the UI must show that, not a zero. */
   probability: number | null;
   components: RiskComponent[];

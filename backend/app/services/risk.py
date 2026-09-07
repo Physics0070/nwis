@@ -69,6 +69,9 @@ class RiskResult:
     mode: str
     score: float
     risk_level: str
+    # False when not one component could be computed. The score is meaningless then, and
+    # a caller must say so rather than render it.
+    evaluated: bool
     probability: float | None
     components: list[RiskComponent]
     evidence: list[HistoricalEvidence]
@@ -83,6 +86,7 @@ class RiskResult:
             "well_name": self.well_name,
             "depth_m": self.depth_m,
             "mode": self.mode,
+            "evaluated": self.evaluated,
             "score": round(self.score, 4),
             "risk_level": self.risk_level,
             "probability": self.probability,
@@ -304,10 +308,18 @@ def assess(
             else 0.0
         )
     else:
+        # Nothing could be computed: no telemetry, no historical evidence in range, no
+        # measurements to apply rules to. A score of 0.0 classified as INFO reads as
+        # "assessed, and it is fine" — which is the opposite of the truth and exactly the
+        # zero-for-unknown this project refuses everywhere else.
         score = 0.0
-        notes.append("No signal was available; the score defaults to zero rather than "
-                     "implying safety.")
+        notes.append(
+            "Risk could not be evaluated at this depth: no anomaly score, no historical "
+            "evidence within the look-ahead window, and no measurements to apply rules "
+            "to. This is an absence of signal, not a low risk."
+        )
 
+    evaluated = bool(components)
     level = classify_level(score, thresholds)
 
     narrative = _build_narrative(well, depth_m, level, components, evidence, mode)
@@ -319,6 +331,7 @@ def assess(
         mode=mode,
         score=float(score),
         risk_level=level,
+        evaluated=evaluated,
         # Only a calibrated supervised model may report a probability.
         probability=None,
         components=components,

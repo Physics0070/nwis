@@ -307,6 +307,11 @@ export default function Simulator() {
                 <Loading label="Evaluating" />
               ) : risk.isError ? (
                 <ErrorState error={risk.error} onRetry={() => risk.refetch()} />
+              ) : !risk.data.evaluated ? (
+                <Unavailable
+                  reason="Risk could not be evaluated at this depth."
+                  hint="No anomaly score, no historical evidence within the look-ahead window, and no measurements to apply rules to. That is an absence of signal, not a low risk."
+                />
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
