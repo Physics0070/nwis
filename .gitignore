@@ -40,3 +40,6 @@ Thumbs.db
 # Pre-existing submission binaries kept on disk but out of version control
 *.pptx
 *.xlsx
+
+# Third-party document, not ours to redistribute.
+SIH 2026 Rules and FAQ.pdf
