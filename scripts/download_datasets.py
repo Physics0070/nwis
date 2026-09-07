@@ -128,13 +128,17 @@ def fetch_npd(config, *, force: bool = False) -> None:
     sourced here rather than invented.
     """
     raw_dir = ensure_dir(config.get("datasets.npd.raw_dir"))
-    url = config.get("datasets.npd.wellbore_csv")
-    dest = raw_dir / "npd_wellbore_exploration_all.csv"
-    try:
-        _download(url, dest, force=force)
-    except Exception as exc:  # network/source availability is not fatal to the build
-        log.warning("npd_download_failed", error=str(exc),
-                    impact="well surface coordinates must be supplied another way")
+    for key, filename in (
+        ("wellbore_development_csv", "wellbore_development_all.csv"),
+        ("wellbore_exploration_csv", "wellbore_exploration_all.csv"),
+    ):
+        url = config.get(f"datasets.npd.{key}")
+        try:
+            _download(url, raw_dir / filename, force=force)
+        except Exception as exc:  # source availability is not fatal to the build
+            log.warning("npd_download_failed", file=filename, error=str(exc),
+                        impact="affected wells stay unmapped rather than being placed "
+                               "at an invented position")
 
 
 def main() -> int:

@@ -21,13 +21,13 @@ Last updated: 2026-09-06 (session 1)
 
 - [x] Centralised configuration (`config/*.yaml` + `.env.example`), zero magic numbers
 - [x] Structured logging
-- [ ] SQLAlchemy models: wells, locations, trajectories, logs, formations,
-      lithology_predictions, telemetry, events, risk, alerts, mitigations,
-      embeddings, documents, knowledge, engineer_actions, model_versions
+- [x] SQLAlchemy models: 16 tables (wells, trajectories, logs, formations,
+      lithology_predictions, telemetry, anomalies, events, mitigations, risk,
+      alerts, embeddings, documents, chunks, engineer_actions, model_versions)
 - [ ] Alembic migrations
-- [~] Storage adapter layer — dialect-adaptive column types written; queries pending
+- [x] Storage adapter layer — dialect-adaptive types + runtime capability detection
 - [ ] `docker-compose.yml` (postgres+postgis+timescale+pgvector, backend, frontend)
-- [ ] Database bring-up verified
+- [x] Database bring-up verified (16 tables, honest fallback reporting)
 
 ## Phase 2 — Dataset acquisition & profiling
 
@@ -144,6 +144,8 @@ Last updated: 2026-09-06 (session 1)
 | **Lithology model** | **XGBoost (GPU, 196 s): holdout accuracy 0.7498, macro F1 0.3852, kappa 0.5659, FORCE penalty 0.6322** vs majority baseline 0.6139 / 0.0761 |
 | Volve reality check | Mirror is completion/workover, not drilling-ahead: ROP constant 0, Depth constant. Scoped honestly (see A10) |
 | Message depths | All 184 remarks given real depths by time-join to telemetry (were all constant total depth) |
+| Database loaded | 101 wells, 1,449 formation intervals, 18,842 log samples, 86,800 telemetry rows, 154 trajectory stations, 184 events, 0 wells without a real position |
+| CRS cross-validated | Volve (NPD source) lands at 58.441N 1.886E; nearest FORCE well (independent source) is 15/9-17 at 3.6 km, same licence block 15/9 |
 | Known limitation | Chalk -> Limestone 99.8%: carbonate family is not separable on the available curves. Documented, not hidden |
 
 ## Open items / risks

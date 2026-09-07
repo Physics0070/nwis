@@ -20,6 +20,9 @@ database:
   pool_size: 5
   max_overflow: 10
   statement_timeout_seconds: 30
+  # Keep the probe short: if the Postgres stack is not up, fall back promptly rather
+  # than stalling API startup on an OS-level connect timeout.
+  connect_timeout_seconds: 3
 
 api:
   host: "0.0.0.0"
@@ -57,8 +60,25 @@ datasets:
     witsml_subdir: "witsml"
   npd:
     # Norwegian Offshore Directorate factpages — public wellbore coordinates.
-    wellbore_csv: "https://factpages.sodir.no/public?/Factpages/external/tableview/wellbore_exploration_all&rs:Command=Render&rc:Toolbar=false&rc:Parameters=f&IpAddress=1.1.1.1&CultureCode=en&rs:Format=CSV"
+    # Full export requires Top100=false; without it the endpoint returns only 300 rows.
+    # UTM zone 31, ED50 - the same CRS family as the FORCE coordinates.
+    wellbore_development_csv: "https://factpages.sodir.no/public?/Factpages/external/tableview/wellbore_development_all&rs:Command=Render&rc:Toolbar=false&rc:Parameters=f&Top100=false&IpAddress=1.1.1.1&CultureCode=en&rs:Format=CSV"
+    wellbore_exploration_csv: "https://factpages.sodir.no/public?/Factpages/external/tableview/wellbore_exploration_all&rs:Command=Render&rc:Toolbar=false&rc:Parameters=f&Top100=false&IpAddress=1.1.1.1&CultureCode=en&rs:Format=CSV"
+    name_column: "wlbWellboreName"
+    northing_column: "wlbNsUtm"
+    easting_column: "wlbEwUtm"
+    utm_zone_column: "wlbUtmZone"
+    source_crs: "EPSG:23031"
     raw_dir: "data/raw/npd"
+
+ingestion:
+  # Raw FORCE logs are sampled every 0.152 m (1.17 M rows). That is far finer than any
+  # display or depth lookup needs, so samples are decimated on the way into the database.
+  # Full resolution stays in data/processed for model training.
+  log_depth_step_m: 5.0
+  # Curves stored per log sample. Chosen from measured coverage in the profiling report.
+  log_curves: ["GR", "RHOB", "NPHI", "DTC", "RDEP", "RMED", "CALI", "PEF", "SP", "DRHO"]
+  # Telemetry is already resampled by the Volve pipeline; loaded as-is.
 
 profiling:
   max_example_values: 10

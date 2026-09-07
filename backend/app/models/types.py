@@ -17,7 +17,7 @@ import json
 from typing import Any, Sequence
 
 from sqlalchemy import Float, String
-from sqlalchemy.types import TypeDecorator, UserDefinedType
+from sqlalchemy.types import TypeDecorator
 
 POSTGRES_DIALECTS = {"postgresql"}
 
@@ -61,30 +61,32 @@ class Vector(TypeDecorator):
         return [float(v) for v in json.loads(value)]
 
 
-class GeographyPoint(UserDefinedType):
-    """Surface location: PostGIS geography(Point,4326) on Postgres, WKT text elsewhere."""
+class GeographyPoint(TypeDecorator):
+    """Surface location: PostGIS geography(Point,4326) on Postgres, WKT text elsewhere.
 
+    Implemented as a TypeDecorator rather than a UserDefinedType because the latter emits
+    its get_col_spec into DDL regardless of dialect, producing invalid SQL on the
+    fallback backend.
+    """
+
+    impl = String
     cache_ok = True
-
-    def get_col_spec(self, **_kw) -> str:
-        return "GEOGRAPHY(Point,4326)"
 
     def load_dialect_impl(self, dialect):
         if dialect.name in POSTGRES_DIALECTS:
-            return self
+            from geoalchemy2 import Geography
+
+            return dialect.type_descriptor(
+                Geography(geometry_type="POINT", srid=4326, spatial_index=False)
+            )
         return dialect.type_descriptor(String())
 
-    def bind_processor(self, dialect):
-        def process(value):
-            return value  # already WKT ('SRID=4326;POINT(lon lat)') or None
+    def process_bind_param(self, value, dialect):
+        # Both backends accept the extended WKT literal produced by point_wkt().
+        return value
 
-        return process
-
-    def result_processor(self, dialect, coltype):
-        def process(value):
-            return value
-
-        return process
+    def process_result_value(self, value, dialect):
+        return value if value is None else str(value)
 
 
 def point_wkt(longitude: float, latitude: float) -> str:
