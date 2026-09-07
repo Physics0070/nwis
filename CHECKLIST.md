@@ -25,7 +25,7 @@ Last updated: 2026-09-06 (session 1)
       lithology_predictions, telemetry, events, risk, alerts, mitigations,
       embeddings, documents, knowledge, engineer_actions, model_versions
 - [ ] Alembic migrations
-- [ ] Storage adapter layer (PostGIS / pgvector / Timescale, with documented local fallback)
+- [~] Storage adapter layer — dialect-adaptive column types written; queries pending
 - [ ] `docker-compose.yml` (postgres+postgis+timescale+pgvector, backend, frontend)
 - [ ] Database bring-up verified
 
@@ -33,8 +33,8 @@ Last updated: 2026-09-06 (session 1)
 
 - [x] Reproducible download scripts (FORCE, Volve, NPD coordinates)
 - [x] FORCE profiling report (wells, curves, missingness, class balance, depth ranges)
-- [ ] Volve WITSML profiling report (logs, curves, units, time/depth coverage)
-- [ ] Data-quality validation rules + report
+- [x] Volve WITSML profiling report (3 wells, 781,558 log rows, units audited)
+- [~] Data-quality validation rules + report (FORCE rules live; Volve pending)
 
 ## Phase 3 — FORCE preprocessing
 
@@ -43,15 +43,15 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 4 — FORCE lithology model
 
-- [ ] Random Forest baseline
-- [ ] XGBoost
-- [ ] Evaluation on unseen wells (accuracy, macro/weighted F1, per-class, confusion matrix)
-- [ ] Model registry entry + metrics persisted (no invented numbers)
-- [ ] MODEL_CARD entry
+- [x] Random Forest baseline (retraining with lighter config after 10.1 h / 901 MB first attempt)
+- [x] XGBoost on RTX 4050 — 196 s, early stopping on macro F1, class-balanced
+- [x] Evaluation on unseen wells — internal 15-well test + official 10-well FORCE holdout
+- [x] Model registry entry + metrics persisted (no invented numbers)
+- [x] MODEL_CARD entry (docs/MODEL_CARD.md)
 
 ## Phase 5 — Volve preprocessing
 
-- [ ] WITSML parser (log, trajectory, message, bhaRun, wbGeometry, wellInfo)
+- [x] WITSML parser (log, trajectory, message, bhaRun, wellInfo)
 - [ ] Normalised telemetry schema + unit conversion
 - [ ] Cleaned/aligned telemetry dataset
 
@@ -140,6 +140,9 @@ Last updated: 2026-09-06 (session 1)
 | FORCE prepared | 15 base curves -> 90 features (rolling 5 m / 15 m mean+std, gradients); depth sampling measured at 0.152 m |
 | Well-level split | 68 train / 15 validation / 15 test wells. Only Basement (1 well dataset-wide) cannot reach val/test |
 | External holdout | FORCE leaderboard set: 136,786 rows across 10 wells absent from training |
+| Volve profiled | 3 wells, 781,558 log rows; messages carry total depth only, so event depth must be recovered by time-join |
+| **Lithology model** | **XGBoost (GPU, 196 s): holdout accuracy 0.7498, macro F1 0.3852, kappa 0.5659, FORCE penalty 0.6322** vs majority baseline 0.6139 / 0.0761 |
+| Known limitation | Chalk -> Limestone 99.8%: carbonate family is not separable on the available curves. Documented, not hidden |
 
 ## Open items / risks
 
