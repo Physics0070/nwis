@@ -1,24 +1,24 @@
 [
   {
-    "document_id": 2,
-    "well": "15/9-13",
-    "title": "45_15_9_13_Completion_report_and_log",
-    "pages_processed": 167,
-    "pages_with_text": 166,
-    "characters": 157278,
+    "document_id": 1,
+    "well": "15/9-17",
+    "title": "60_15_9_17_Completion_report_and_log",
+    "pages_processed": 202,
+    "pages_with_text": 201,
+    "characters": 191406,
     "methods": {
-      "rapidocr": 167
+      "rapidocr": 202
     },
-    "mean_confidence": 0.9586,
-    "min_confidence": 0.6452,
+    "mean_confidence": 0.9569,
+    "min_confidence": 0.5995,
     "extended_existing_document": true,
     "start_page": 30,
     "pages_stored_before": 30,
-    "chunks": 216,
-    "events_stored": 76,
-    "mitigations_stored": 19,
+    "chunks": 271,
+    "events_stored": 86,
+    "mitigations_stored": 30,
     "formation_intervals_found": 0,
     "formation_intervals_stored": 0,
-    "records_found": 103
+    "records_found": 113
   }
 ]
