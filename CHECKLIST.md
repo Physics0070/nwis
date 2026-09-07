@@ -68,10 +68,10 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 8 — Contextual analogue engine
 
-- [ ] Well/segment feature representation + embeddings
-- [ ] Vector similarity search
-- [ ] Transparent weighted re-ranking (weights in config)
-- [ ] Top-K configurable
+- [x] Well/segment feature representation + embeddings (3,620 segments, 32 interpretable dims)
+- [x] Vector similarity search (pgvector column; NumPy cosine on fallback)
+- [x] Transparent weighted re-ranking; unavailable dimensions renormalised and reported
+- [x] Top-K configurable
 
 ## Phase 9 — Historical event intelligence
 
@@ -146,6 +146,7 @@ Last updated: 2026-09-06 (session 1)
 | Message depths | All 184 remarks given real depths by time-join to telemetry (were all constant total depth) |
 | Database loaded | 101 wells, 1,449 formation intervals, 18,842 log samples, 86,800 telemetry rows, 154 trajectory stations, 184 events, 0 wells without a real position |
 | CRS cross-validated | Volve (NPD source) lands at 58.441N 1.886E; nearest FORCE well (independent source) is 15/9-17 at 3.6 km, same licence block 15/9 |
+| Analogue engine | Proven non-proximity: 16/10-1 at 36 km ranks top-5 on geology 0.9873 despite geography score 0.2372. All top matches share Tor Fm. |
 | Known limitation | Chalk -> Limestone 99.8%: carbonate family is not separable on the available curves. Documented, not hidden |
 
 ## Open items / risks

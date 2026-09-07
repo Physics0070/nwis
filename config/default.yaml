@@ -274,7 +274,17 @@ anomaly:
 analogue:
   top_k: 5
   candidate_pool: 50
+
+  # Segment embedding. Dimensions = curves x statistics + 2 depth terms.
+  # 10 curves x 3 statistics (mean, std, median) + thickness + mid-depth = 32.
+  # Every dimension is a named petrophysical statistic, so a match can be explained.
   embedding_dim: 32
+  embedding_curves: ["GR", "RHOB", "NPHI", "DTC", "RDEP", "RMED", "CALI", "PEF", "SP", "DRHO"]
+  segment_length_m: 100.0
+  segment_stride_m: 50.0        # overlapping windows so a query never falls between segments
+  min_samples_per_segment: 50
+  depth_scale_m: 5000.0         # normalises depth terms into roughly unit range
+  feature_clip_sigma: 5.0       # bounds outliers so one absurd reading cannot dominate
   weights:
     geology: 0.30
     formation: 0.20
@@ -286,6 +296,18 @@ analogue:
     distance_decay_km: 25.0
   depth:
     tolerance_m: 300.0
+
+  # Channels compared when scoring drilling-behaviour similarity, with the scale over
+  # which a difference is considered large. Only channels present in BOTH wells count.
+  behaviour_channels: ["standpipe_pressure_bar", "flow_in_lpm", "hookload_kn",
+                       "surface_torque_knm", "bit_rpm", "weight_on_bit_kn"]
+  behaviour_scales:
+    standpipe_pressure_bar: 50.0
+    flow_in_lpm: 800.0
+    hookload_kn: 300.0
+    surface_torque_knm: 5.0
+    bit_rpm: 30.0
+    weight_on_bit_kn: 50.0
 
 risk:
   mode: "auto"                  # auto | supervised | hybrid_indicator
