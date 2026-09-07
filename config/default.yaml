@@ -383,11 +383,6 @@ replay:
   tick_interval_seconds: 1.0
   autostart: false
 
-embeddings:
-  text_model: "sentence-transformers/all-MiniLM-L6-v2"
-  enabled: true
-  batch_size: 32
-
 documents:
   raw_dir: "data/raw/documents"
   # OCR is expensive (about a second per page per 100 DPI), so extracted page text is

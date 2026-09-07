@@ -211,7 +211,8 @@ def find_analogues(
                     "geology",
                     similarity,
                     weights.get("geology", 0.0),
-                    f"cosine similarity of 32-dimension petrophysical vectors over "
+                    f"cosine similarity of {len(candidate_segment.embedding)}-dimension "
+                    f"petrophysical vectors over "
                     f"{candidate_segment.segment_top_m:.0f}-{candidate_segment.segment_base_m:.0f} m",
                 )
             )
