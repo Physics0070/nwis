@@ -37,6 +37,7 @@ Full metrics and limitations: [`MODEL_CARD.md`](MODEL_CARD.md).
 python -m ml.lithology.train
 python -m ml.lithology.train --smoke          # fast end-to-end check
 python -m ml.lithology.train --select-only    # re-decide which model is served
+python -m ml.lithology.cross_validate         # settle the selection on folded evidence
 ```
 
 RandomForest and XGBoost, 90 features, 1,170,511 rows, well-level 68/15/15 split.
@@ -62,6 +63,49 @@ changing from 0.3336 to 0.3337 — statistically nothing.
 
 The 10-hour run bought nothing. It is recorded here because "it trained for ten hours" is
 not evidence of a better model, and reproducibility on a laptop is a real requirement.
+
+### The two unseen-well estimates disagree, and how that is handled
+
+RandomForest wins on the 15 validation wells (macro F1 0.3855 against 0.3340); XGBoost
+wins on the 10-well FORCE leaderboard holdout (0.3852 against 0.3337). The pre-committed
+rule is validation-only, so RandomForest is served.
+
+**Selecting the holdout winner would be selecting on the test set**, which would
+invalidate the only genuinely external number this project reports. The disagreement was
+recorded in `artifacts/models/lithology/selected.json` rather than resolved by picking
+whichever model looked better on the data that was supposed to be untouched.
+
+The disagreement is what a 15-well validation set looks like when the difference between
+two models is smaller than the difference between two draws of wells.
+
+### Grouped cross-validation
+
+`ml/lithology/cross_validate.py` gives every selection well a turn as unseen data.
+
+* **Folds are grouped by well** (`GroupKFold`). Adjacent depth samples within a well are
+  nearly identical, so splitting by row would leak and inflate every score. The code
+  asserts that no well appears on both sides of a fold.
+* **Only selection-legal wells participate** — the train and validation wells named in
+  `lithology_model.cross_validation.use_splits`. The 15 test wells and the 10 leaderboard
+  holdout wells take no part, and a configuration that lists `test` raises instead of
+  training.
+* **Boosting's early-stopping set is carved from each fold's own training wells**, whole
+  wells at a time, so the fold's evaluation wells are never seen during fitting.
+* Because both candidates are fitted and scored on **exactly the same folds**, the
+  comparison is paired: the per-fold difference cancels the fold-to-fold variance that
+  swamps the single-split comparison.
+
+Results are written to `artifacts/models/lithology/cross_validation.json` with the mean,
+the standard deviation, the per-fold scores and the per-fold win record. A paired t-test
+over folds is reported **with its caveat attached**: CV folds share training data, so the
+test is anti-conservative, and with this few folds it describes the size of the gap
+relative to the spread rather than establishing a significant difference.
+
+The verdict is *attached* to `selected.json`, not substituted into it. `selected_model`
+still records what the pre-committed rule chose; the cross-validated result sits beside it
+saying whether that choice survives a stronger test. Changing the served model remains a
+deliberate act of re-opening a pre-committed selection rule, not something a script does
+quietly.
 
 ### Leakage prevented deliberately
 

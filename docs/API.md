@@ -14,6 +14,8 @@ Enforced in code and covered by tests in `backend/tests/test_api.py`.
 | No silently reduced evidence | Every analogue match reports `dimensions_used` and `dimensions_unavailable`; weights are renormalised over what was computable. |
 | Absence is explicit | A well without telemetry returns **409**, not `[]` — an empty array reads as "all quiet". |
 | Untrained is not zero | `/api/models/{name}` returns **404** saying the model has not been trained, never placeholder metrics. |
+| Retrieval is not authorship | `/api/documents/search` returns source passages with page citations. No endpoint generates prose about a well, and no LLM writes a risk assessment or a mitigation. |
+| Partial index is disclosed | Search reports how many passages were searched against how many are stored, so an incomplete index cannot pass as a complete search. |
 
 ## Wells and geology
 
@@ -43,7 +45,46 @@ Enforced in code and covered by tests in `backend/tests/test_api.py`.
 | POST | `/api/engineer-actions` | `accepted` / `rejected` / `investigating` / `resolved` |
 | GET | `/api/wells/{id}/engineer-actions` | |
 | GET | `/api/models`, `/api/models/{name}` | measured metrics only |
+| GET | `/api/documents/search` | semantic search over report passages; `q`, `well_id`, `limit`, `min_similarity` |
 | GET | `/api/status` | counts, active storage backends, warnings |
+
+### `/api/documents/search`
+
+Returns **passages, not answers**. Each result is the OCR'd text of a stored chunk with
+the document title and page number it came from, so the engineer reads the source and the
+citation says where to find it. Nothing here summarises or paraphrases.
+
+The response carries a `provenance` object describing what was actually searched:
+
+```json
+{
+  "results": [
+    {
+      "chunk_id": 41,
+      "document_title": "60_15_9_17_Completion_report_and_log",
+      "well_id": 7, "well_name": "15/9-17", "page_number": 17,
+      "similarity": 0.7514,
+      "text": "…the shale/claystone is mainly medium to dark grey, firm, subfissile…"
+    }
+  ],
+  "provenance": {
+    "passages_searched": 75, "passages_indexed": 75, "passages_total": 75,
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "similarity_metric": "cosine", "min_similarity": 0.25
+  }
+}
+```
+
+`passages_indexed` below `passages_total` adds a `note` naming how many stored passages
+have no embedding and were therefore not searched — a partial index must not read as a
+complete search.
+
+Similarity is raw cosine in `[-1, 1]`, and results below `min_similarity` are dropped
+rather than returned as the least-bad passage. An **empty `results` list means no passage
+cleared the threshold**, which is a real absence.
+
+Returns **503**, naming the command that builds the index, when no passage has an
+embedding yet — never an empty list, which would read as "nothing in the reports matches".
 
 ## Replay and live telemetry
 

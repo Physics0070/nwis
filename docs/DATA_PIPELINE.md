@@ -162,6 +162,8 @@ the substitution is auditable rather than invisible.
 ```bash
 python -m data_pipeline.documents.ingest --list
 python -m data_pipeline.documents.ingest --well 15/9-13 --max-pages 30
+python -m data_pipeline.documents.ingest --start-page 30 --max-pages 202   # go deeper
+python -m data_pipeline.documents.embed                                    # index for search
 ```
 
 The Sodir wellbore document index lists **388 licensee reports covering 75 of our wells**.
@@ -189,6 +191,45 @@ Confidence is conservative and compounds: OCR page confidence × pattern reliabi
 only when a remedial action or outcome is actually found in the surrounding sentences.
 Records below `documents.nlp.min_confidence` are counted in the ingestion report but not
 written to the database.
+
+### Reading deeper into a report
+
+The first ~30 pages of these reports are geological sample descriptions. The
+drilling-operations narrative — where problem, action and outcome chains actually live —
+is further in; the reports' own tables of contents list a "DRILLING REPORT" section well
+past that point.
+
+`--start-page` reads from a page offset. Passing one beyond the range already stored
+**extends** the existing document rather than skipping it or creating a duplicate: chunk
+numbering continues from the highest stored index, pages at or below the deepest stored
+page are filtered out, and extracted events are deduplicated by document, event type and
+source text. So a report can be ingested in passes as deeper pages become worth the OCR
+cost.
+
+OCR page text is cached under `documents.cache_dir`, keyed by document, start page and
+page count. Re-running extraction to improve the NLP rules costs nothing; only a page
+range never read before pays for OCR.
+
+### Semantic search over passages
+
+Every chunk is stored with `embedding = NULL` at ingestion and filled in by a separate
+stage, because OCR is expensive and rarely repeated while the choice of encoder may be
+revisited without re-reading a PDF.
+
+`data_pipeline/documents/embed.py` encodes passages with a pretrained sentence-transformer
+(`documents.embedding.model`) and stores L2-normalised vectors, which makes cosine
+similarity a dot product and lets the pgvector cosine index and the NumPy fallback agree
+exactly.
+
+These vectors are **384-dimensional and live in a different space** from the
+32-dimensional petrophysical segment embeddings used by the analogue engine. Different
+model, different meaning; the two constants are separate and the column type rejects a
+vector of the wrong width, so the two can never be silently compared. If the configured
+encoder produces a width that disagrees with the schema, loading fails before anything is
+encoded rather than writing vectors that would rank nonsense confidently.
+
+Search is served by `/api/documents/search` and returns passages with page citations,
+never a generated answer. See `docs/API.md`.
 
 ---
 
