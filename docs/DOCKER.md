@@ -46,8 +46,31 @@ carrying torch, spaCy, XGBoost and scikit-learn. Budget **10–12 GB free**. Che
 Get-PSDrive C | Select-Object @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}
 ```
 
-If C: is tight, move Docker's data root to another drive in
-Docker Desktop → Settings → Resources → Advanced → Disk image location.
+If C: is tight, move Docker's data disk to another drive. **The `DataFolder` key in
+`%APPDATA%\Docker\settings-store.json` does not do this on the WSL2 backend** — Docker
+ignores it and recreates the disk on C: anyway. Two things live in separate places:
+
+| What | Where | Size |
+|---|---|---|
+| `docker-desktop` WSL distro (the VM) | a registered WSL distro | ~0.1 GB |
+| `docker_data.vhdx` (images, layers, volumes) | `%LOCALAPPDATA%\Docker\wsl\disk` | tens of GB |
+
+Only the second one matters, and it is not a WSL distro, so `wsl --manage --move` does not
+relocate it either. The reliable fix is a directory junction, with Docker stopped:
+
+```powershell
+# Docker Desktop must be closed and `wsl --shutdown` run first.
+Move-Item "$env:LOCALAPPDATA\Docker\wsl\disk" "D:\DockerData\disk"
+cmd /c mklink /J "$env:LOCALAPPDATA\Docker\wsl\disk" "D:\DockerData\disk"
+```
+
+Docker keeps writing to the path it expects; the bytes land on D:. Verify with
+`(Get-Item "$env:LOCALAPPDATA\Docker\wsl\disk").LinkType` — it should say `Junction`.
+
+**Measured on this machine:** a full build consumed roughly 10 GB and took C: from 17.2 GB
+free down to 2.2 GB before the build was stopped. At that point Windows itself began
+failing to start processes (`fork: Resource temporarily unavailable`, PowerShell unable to
+start the CLR). Do not let C: approach zero — relocate first.
 
 ---
 
