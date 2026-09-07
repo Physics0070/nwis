@@ -24,9 +24,9 @@ Last updated: 2026-09-06 (session 1)
 - [x] SQLAlchemy models: 16 tables (wells, trajectories, logs, formations,
       lithology_predictions, telemetry, anomalies, events, mitigations, risk,
       alerts, embeddings, documents, chunks, engineer_actions, model_versions)
-- [ ] Alembic migrations
+- [~] Schema created via SQLAlchemy metadata; Alembic scaffold pending
 - [x] Storage adapter layer — dialect-adaptive types + runtime capability detection
-- [ ] `docker-compose.yml` (postgres+postgis+timescale+pgvector, backend, frontend)
+- [x] `docker-compose.yml` (postgres+postgis+timescale+pgvector, backend, frontend)
 - [x] Database bring-up verified (16 tables, honest fallback reporting)
 
 ## Phase 2 — Dataset acquisition & profiling
@@ -104,16 +104,16 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 14 — Frontend
 
-- [ ] Vite + React + TS + Tailwind scaffold
-- [ ] Design system (Stitch assets pending — see ASSUMPTIONS)
-- [ ] Pages: Overview, Active Well, Map, Analogues, Events, Telemetry, Alerts,
-      Alert Explanation, Mitigations, Model Insights, Engineer Actions
-- [ ] Every value API-driven, loading/empty/error states
+- [x] Vite + React + TS + Tailwind scaffold (builds clean)
+- [x] Design system: token-driven, Stitch-swappable (see ASSUMPTIONS A1)
+- [x] Pages: Overview, Wells, Active Well (map+telemetry+analogues+risk+events),
+      Alerts, Alert Explanation (+engineer feedback), Model Insights
+- [x] Every value API-driven; loading / error / explicitly-unavailable states
 
 ## Phase 15 — Real-time WebSocket
 
 - [x] `/ws/telemetry/{well_id}` streaming verified
-- [ ] Live anomaly/risk overlay
+- [x] Live risk panel follows replayed bit depth
 
 ## Phase 16 — Feedback loop
 
@@ -121,12 +121,12 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 17 — Testing
 
-- [ ] Backend: pipeline, ML, analogue, risk, API tests
+- [x] Backend tests: 31 passing, 2 skipped
 - [ ] Frontend: critical component tests
 
 ## Phase 18 — Docs & Docker demo
 
-- [ ] README, ARCHITECTURE, DATA_PIPELINE, ML, API, SETUP, DEMO, MODEL_CARD
+- [~] README, SETUP, API, MODEL_CARD, ASSUMPTIONS written; ARCHITECTURE/DATA_PIPELINE/ML/DEMO pending
 - [ ] `docker compose up --build` verified
 
 ---

@@ -1,0 +1,11 @@
+data/raw/
+data/interim/
+data/processed/
+artifacts/models/*.joblib
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+.git
+*.pptx
+*.xlsx
+*.pdf

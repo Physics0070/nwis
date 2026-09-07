@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-surface-base text-ink-primary font-sans antialiased;
+  }
+  /* Leaflet renders its own containers; keep them on the app's surface colour. */
+  .leaflet-container { background: #0b1015; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+    background: #18232d; color: #e8eef5;
+  }
+}

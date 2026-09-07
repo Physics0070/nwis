@@ -79,23 +79,38 @@ Model selection uses **validation only**; test and holdout are never consulted.
 
 ### Results
 
-Measured on the **10 unseen leaderboard wells**:
+Two candidates were trained. **RandomForest is the selected model**, because selection uses
+validation wells only and it wins there. Both are reported, because they disagree.
 
-| Metric | XGBoost | RandomForest | Majority baseline |
+Measured on the **10 unseen FORCE leaderboard wells**:
+
+| Metric | RandomForest *(selected)* | XGBoost | Majority baseline |
 |---|---:|---:|---:|
-| Accuracy | 0.7498 | 0.7189 | 0.6139 |
-| **Macro F1** | **0.3852** | 0.3336 | 0.0761 |
-| Balanced accuracy | 0.4105 | 0.3738 | 0.0833 |
-| Cohen κ | 0.5659 | 0.5055 | 0.0 |
-| FORCE penalty (lower better) | **0.6322** | 0.7301 | — |
-| Training time | **196 s** (GPU) | 36,280 s (CPU) | — |
-| Artifact size | 5 MB | 901 MB | — |
+| Accuracy | 0.7022 | **0.7498** | 0.6139 |
+| **Macro F1** | 0.3337 | **0.3852** | 0.0761 |
+| Balanced accuracy | 0.4052 | **0.4105** | 0.0833 |
+| FORCE penalty (lower better) | 0.7622 | **0.6322** | — |
+| Validation macro F1 *(selection metric)* | **0.3855** | 0.3340 | — |
+| Training time | 291 s (CPU) | **196 s** (RTX 4050) | — |
+| Artifact size | 179 MB | **5 MB** | — |
+
+**The two unseen-well estimates disagree, and that is reported rather than hidden.**
+RandomForest wins on the validation wells; XGBoost wins on the external holdout wells by a
+clear margin on every metric. The selection rule was fixed in advance — validation only,
+never test or holdout — so RandomForest is what the API serves, and
+`artifacts/models/lithology/selected.json` carries an explicit `disagreement_warning`.
+
+The honest reading is that **neither model is reliably better**: a 15-well validation set is
+too small to separate them, which is itself the finding. Grouped cross-validation over the
+68 training wells would give a stable answer and is the recommended next step. Picking
+XGBoost *because* it scored better on the holdout would be selecting on the test set, which
+is exactly the error that produces inflated hackathon numbers.
 
 Accuracy is reported next to the majority-class baseline throughout, because predicting
 "Shale" for every row already scores 0.61. Macro F1 and balanced accuracy are the honest
 headline numbers.
 
-**Per-class, external holdout (XGBoost):**
+**Per-class, external holdout (XGBoost, class-balanced):**
 
 | Class | Support | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|
@@ -109,6 +124,18 @@ headline numbers.
 | Chalk | 625 | 0.000 | 0.000 | 0.000 |
 | Dolomite | 416 | 0.000 | 0.000 | 0.000 |
 | Anhydrite | 125 | 0.000 | 0.000 | 0.000 |
+
+**Effect of the two training decisions**, measured rather than assumed:
+
+| Change | Validation macro F1 | Holdout macro F1 | Holdout accuracy |
+|---|---:|---:|---:|
+| XGBoost, stop on log-loss | 0.3680 | 0.3146 | 0.7641 |
+| + stop on macro F1 instead | 0.3548 | 0.3441 | 0.7707 |
+| + class balancing | 0.3340 | **0.3852** | 0.7498 |
+
+Stopping on log-loss halted training at iteration 54; stopping on macro F1 ran to 384.
+Class balancing traded 2 accuracy points for a 12% relative gain in macro F1 — deliberate,
+because a model that only predicts common lithologies cannot flag an unusual interval.
 
 ### Known limitations
 

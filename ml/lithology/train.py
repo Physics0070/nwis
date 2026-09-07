@@ -188,6 +188,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Train the FORCE lithology model")
     parser.add_argument("--models", action="append", default=None,
                         help="restrict to specific candidates (repeatable)")
+    parser.add_argument("--select-only", action="store_true",
+                        help="recompute model selection from the registry without training")
     parser.add_argument("--smoke", action="store_true",
                         help="fast end-to-end validation on a few wells and few trees; "
                              "results are NOT registered as a usable model")
@@ -251,7 +253,9 @@ def main() -> int:
     penalty_matrix = np.load(penalty_path) if penalty_path.exists() else None
     penalty_order = list(LITHOLOGY_CODE_NAMES.keys())
 
-    candidates = args.models or list(config.get("lithology_model.candidates"))
+    candidates = [] if args.select_only else (
+        args.models or list(config.get("lithology_model.candidates"))
+    )
     registry = ModelRegistry(config.get("paths.models"))
     artifacts_dir = ensure_dir(Path(config.get("paths.models")) / MODEL_NAME)
 

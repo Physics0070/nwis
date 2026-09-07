@@ -1,0 +1,69 @@
+# NWIS full stack.
+#
+#   docker compose up --build
+#
+# Brings up PostgreSQL with PostGIS, TimescaleDB and pgvector, the FastAPI backend and the
+# React frontend. When this stack is running the backend uses the real extensions; without
+# it the backend falls back to the local storage backend and says so in /api/status.
+#
+# Secrets come from .env (copy .env.example). Nothing is hardcoded here.
+
+services:
+  database:
+    build:
+      context: ./docker/postgres
+    container_name: nwis-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nwis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-nwis}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - nwis-db-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nwis} -d ${POSTGRES_DB:-nwis}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: nwis-api
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      NWIS_ENV: ${NWIS_ENV:-production}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-nwis}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-nwis}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # With a real Postgres stack available, refuse to silently fall back.
+      NWIS__DATABASE__ALLOW_FALLBACK: "false"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Models and processed data are build artefacts, mounted rather than baked in.
+      - ./artifacts:/app/artifacts:ro
+      - ./data/processed:/app/data/processed:ro
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-ws://localhost:8000}
+    container_name: nwis-web
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-5173}:80"
+    restart: unless-stopped
+
+volumes:
+  nwis-db-data:
