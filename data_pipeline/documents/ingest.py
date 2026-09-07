@@ -330,6 +330,10 @@ def ingest_document(
         "formation_intervals_found": len(formation_records),
         "formation_intervals_stored": stored_formations,
         "records_found": len(extracted["records"]),
+        # Mentions the extractor found but refused to store, with why. Kept in the report
+        # so a fall in the event count is explainable rather than mysterious.
+        "mentions_excluded": len(extracted.get("excluded", [])),
+        "exclusion_reasons": extractor.count_exclusion_reasons(extracted.get("excluded", [])),
     }
     log.info("document_ingested", **{k: v for k, v in result.items() if k != "methods"})
     return result

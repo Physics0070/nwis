@@ -351,11 +351,11 @@ def test_routine_exclusion_matches_by_span_not_by_presence():
 
 def test_exclusions_are_counted_and_reasoned_not_dropped_silently():
     """"We discarded N mentions, for these reasons" is itself a reviewable claim."""
-    from data_pipeline.documents.extract import _count_reasons
+    from data_pipeline.documents.extract import count_exclusion_reasons
 
     excluded = [
         (1, "a", "tight_hole", "denied_by_report"),
         (2, "b", "equipment_failure", "routine:leak off"),
         (3, "c", "tight_hole", "denied_by_report"),
     ]
-    assert _count_reasons(excluded) == {"denied_by_report": 2, "routine:leak off": 1}
+    assert count_exclusion_reasons(excluded) == {"denied_by_report": 2, "routine:leak off": 1}

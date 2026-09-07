@@ -48,6 +48,7 @@ Last updated: 2026-09-07
 - [x] Evaluation on unseen wells — internal 15-well test + official 10-well FORCE holdout
 - [x] Model registry entry + metrics persisted (no invented numbers)
 - [x] MODEL_CARD entry (docs/MODEL_CARD.md)
+- [x] Grouped (by well) cross-validation to settle the validation/holdout disagreement
 
 ## Phase 5 — Volve preprocessing
 
@@ -89,7 +90,13 @@ Last updated: 2026-09-07
 
 - [x] Document ingestion pipeline (OCR + NLP, page-text caching)
 - [x] Entity/event extraction with provenance + confidence
-- [x] Knowledge records persisted (2 docs, 75 chunks, 33 formations, 1 event)
+- [x] Knowledge records persisted (2 docs, 562 chunks, 33 formations, 147 events, 48 mitigations)
+- [x] Deep-page ingestion — `--start-page` extends a stored document; both reports read
+      in full (429 pages)
+- [x] Extraction precision — denied mentions and routine operations excluded, counted
+      and reported by reason
+- [x] `--reextract` — re-run NLP over cached page text with no download and no OCR
+- [x] Passage embeddings (562/562) + semantic search endpoint and UI
 
 ## Phase 12 — Telemetry replay engine
 
@@ -107,7 +114,7 @@ Last updated: 2026-09-07
 - [x] Vite + React + TS + Tailwind scaffold (builds clean)
 - [x] Design system: token-driven, Stitch-swappable (see ASSUMPTIONS A1)
 - [x] Pages: Overview, Wells, Active Well (map+telemetry+analogues+risk+events),
-      Alerts, Alert Explanation (+engineer feedback), Model Insights
+      Alerts, Alert Explanation (+engineer feedback), Model Insights, Reports (search)
 - [x] Every value API-driven; loading / error / explicitly-unavailable states
 
 ## Phase 15 — Real-time WebSocket
@@ -121,7 +128,7 @@ Last updated: 2026-09-07
 
 ## Phase 17 — Testing
 
-- [x] Backend tests: 31 passing, 2 skipped
+- [x] Backend tests: 73 passing
 - [x] Frontend tests: 14 passing (missing-value rendering, level vocabulary, formatting)
 
 ## Phase 18 — Docs & Docker demo
@@ -154,6 +161,10 @@ Last updated: 2026-09-07
 | Lithology inference | 18,842 predictions stored; /api/wells/{id}/lithology serves them; UI shows lithology at depth |
 | Deployment hardening | Production config, fail-fast startup checks, nginx same-origin proxy (no CORS), non-root image, security headers, one-command bootstrap |
 | Known limitation | Chalk -> Limestone 99.8%: carbonate family is not separable on the available curves. Documented, not hidden |
+| Reports read in full | 429 pages OCR'd (197 + 232) at 0.957 mean confidence. Pages 31+ are the drilling narrative, as predicted: 191,406 and 157,278 characters against 21,869 and 26,529 for the first 30 pages |
+| Institutional memory | **48 mitigations, up from 0.** 147 document events across 10 categories, each carrying the page and the sentence it came from |
+| Extraction precision | 37 mentions excluded and reported by reason: 12 the report explicitly denies ("No tight spot"), 25 routine leak-off tests. Both were being stored as incidents before |
+| Semantic search | 562 passages embedded (MiniLM-L6-v2, 384-d). Retrieval verified against the corpus; a query matching nothing returns nothing rather than the least-bad passage |
 
 ## Open items / risks
 

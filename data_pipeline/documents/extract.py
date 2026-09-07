@@ -469,12 +469,12 @@ def extract_from_pages(pages: Iterable) -> dict[str, list]:
         # never become evidence that it did, and a planned test must never be recorded as
         # a failure — but how often that was suppressed is itself a number worth seeing.
         mentions_excluded=len(excluded),
-        exclusion_reasons=_count_reasons(excluded),
+        exclusion_reasons=count_exclusion_reasons(excluded),
     )
     return {"records": records, "events": events, "excluded": excluded}
 
 
-def _count_reasons(excluded: list) -> dict[str, int]:
+def count_exclusion_reasons(excluded: list) -> dict[str, int]:
     counts: dict[str, int] = {}
     for entry in excluded:
         reason = entry[3]
