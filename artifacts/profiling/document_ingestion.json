@@ -1,40 +1,24 @@
 [
   {
-    "document_id": 1,
-    "well": "15/9-17",
-    "title": "60_15_9_17_Completion_report_and_log",
-    "pages_processed": 30,
-    "pages_with_text": 30,
-    "characters": 26529,
-    "methods": {
-      "rapidocr": 30
-    },
-    "mean_confidence": 0.9697,
-    "min_confidence": 0.8894,
-    "chunks": 39,
-    "events_stored": 1,
-    "mitigations_stored": 0,
-    "formation_intervals_found": 13,
-    "formation_intervals_stored": 13,
-    "records_found": 14
-  },
-  {
     "document_id": 2,
     "well": "15/9-13",
     "title": "45_15_9_13_Completion_report_and_log",
-    "pages_processed": 30,
-    "pages_with_text": 30,
-    "characters": 21869,
+    "pages_processed": 167,
+    "pages_with_text": 166,
+    "characters": 157278,
     "methods": {
-      "rapidocr": 30
+      "rapidocr": 167
     },
-    "mean_confidence": 0.9684,
-    "min_confidence": 0.8976,
-    "chunks": 36,
-    "events_stored": 0,
-    "mitigations_stored": 0,
-    "formation_intervals_found": 20,
-    "formation_intervals_stored": 20,
-    "records_found": 22
+    "mean_confidence": 0.9586,
+    "min_confidence": 0.6452,
+    "extended_existing_document": true,
+    "start_page": 30,
+    "pages_stored_before": 30,
+    "chunks": 216,
+    "events_stored": 76,
+    "mitigations_stored": 19,
+    "formation_intervals_found": 0,
+    "formation_intervals_stored": 0,
+    "records_found": 103
   }
 ]

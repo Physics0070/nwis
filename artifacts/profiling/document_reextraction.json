@@ -1,0 +1,22 @@
+[
+  {
+    "document_id": 1,
+    "title": "60_15_9_17_Completion_report_and_log",
+    "pages_from_cache": 30,
+    "events_removed": 1,
+    "mitigations_removed": 0,
+    "events_stored": 1,
+    "mitigations_stored": 0,
+    "mentions_excluded": 0
+  },
+  {
+    "document_id": 2,
+    "title": "45_15_9_13_Completion_report_and_log",
+    "pages_from_cache": 197,
+    "events_removed": 71,
+    "mitigations_removed": 18,
+    "events_stored": 60,
+    "mitigations_stored": 18,
+    "mentions_excluded": 18
+  }
+]

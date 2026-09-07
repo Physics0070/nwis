@@ -277,3 +277,85 @@ def test_ingest_exposes_a_start_page_argument():
     signature = inspect.signature(ingest_document)
     assert "start_page" in signature.parameters
     assert signature.parameters["start_page"].default == 0
+
+
+# ------------------------------------------------- what must never become an "event"
+
+
+def test_a_denied_problem_is_not_recorded_as_one():
+    """"No tight spot" says the problem did not happen. Storing it as a tight_hole event
+    would put an incident in front of an engineer that the report explicitly denies."""
+    from data_pipeline.documents.extract import extract_events
+
+    excluded: list = []
+    events = extract_events("At 1842 m. No tight spot.", 5, 0.95, excluded_out=excluded)
+
+    assert events == []
+    assert len(excluded) == 1
+    assert excluded[0][3] == "denied_by_report"
+
+
+def test_negation_does_not_swallow_a_real_problem_in_the_same_page():
+    from data_pipeline.documents.extract import extract_events
+
+    excluded: list = []
+    events = extract_events(
+        "No tight spot. Reamed tight spot at 304 m.", 5, 0.95, excluded_out=excluded
+    )
+    assert [e.category for e in events] == ["tight_hole"]
+    assert events[0].source_text == "Reamed tight spot at 304 m."
+    assert len(excluded) == 1
+
+
+def test_a_planned_leak_off_test_is_not_an_equipment_failure():
+    """A leak-off test is a formation-integrity test. The bare term "leak" matches it,
+    and 11 of 72 extracted events were this before the rule existed."""
+    from data_pipeline.documents.extract import extract_events
+
+    excluded: list = []
+    events = extract_events(
+        "Performed leak off test equivalent to 1.44 SG mudweight.",
+        108,
+        0.95,
+        excluded_out=excluded,
+    )
+    assert events == []
+    assert excluded[0][3].startswith("routine:")
+
+
+def test_a_genuine_leak_is_still_an_equipment_failure():
+    """The routine rule must be narrow: it excludes the phrase, not the term."""
+    from data_pipeline.documents.extract import extract_events
+
+    events = extract_events("A casing leak was observed at 1200 m.", 108, 0.95)
+    assert [e.category for e in events] == ["equipment_failure"]
+
+
+def test_a_kick_drill_is_a_rehearsal_but_a_kick_is_not():
+    from data_pipeline.documents.extract import extract_events
+
+    assert extract_events("The kick drill was performed on tour.", 1, 0.9) == []
+    assert [e.category for e in extract_events("A kick was taken at 2100 m.", 1, 0.9)] == [
+        "well_control"
+    ]
+
+
+def test_routine_exclusion_matches_by_span_not_by_presence():
+    """A sentence mentioning both must not lose the genuine problem."""
+    from data_pipeline.documents.extract import routine_operation_span
+
+    sentence = "after the leak off test the string became stuck at 2100 m."
+    assert routine_operation_span(sentence, sentence.index("leak"), 4) is not None
+    assert routine_operation_span(sentence, sentence.index("stuck"), 5) is None
+
+
+def test_exclusions_are_counted_and_reasoned_not_dropped_silently():
+    """"We discarded N mentions, for these reasons" is itself a reviewable claim."""
+    from data_pipeline.documents.extract import _count_reasons
+
+    excluded = [
+        (1, "a", "tight_hole", "denied_by_report"),
+        (2, "b", "equipment_failure", "routine:leak off"),
+        (3, "c", "tight_hole", "denied_by_report"),
+    ]
+    assert _count_reasons(excluded) == {"denied_by_report": 2, "routine:leak off": 1}

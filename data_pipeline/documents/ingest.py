@@ -335,6 +335,122 @@ def ingest_document(
     return result
 
 
+def cached_pages_for(config, document: Document) -> list:
+    """Every page already OCR'd for a document, from the page-text cache.
+
+    The cache files are the record of which page ranges were read. Reading them back is
+    what makes re-extraction free: no PDF is rasterised and no OCR runs.
+    """
+    from data_pipeline.documents.ocr import PageText
+
+    cache_dir = Path(config.get("documents.cache_dir"))
+    if not cache_dir.exists() or not document.file_path:
+        return []
+
+    stem = Path(document.file_path).stem
+    pages: dict[int, PageText] = {}
+    for cache_file in sorted(cache_dir.glob(f"{stem}__p*.json")):
+        for entry in json.loads(cache_file.read_text(encoding="utf-8")):
+            page = PageText(**entry)
+            # Ranges overlap at their edges; a page read twice is the same page.
+            pages.setdefault(page.page_number, page)
+    return [pages[number] for number in sorted(pages)]
+
+
+def reextract_document(session, config, *, document: Document) -> dict:
+    """Re-run NLP extraction over a document's cached page text.
+
+    Only the *derived* knowledge is rebuilt: events and their mitigations are deleted and
+    re-extracted. Chunks are left alone because they are page text, not an interpretation
+    of it, and re-creating them would discard the embeddings already computed for them.
+
+    This exists so that an extractor fix — a negation rule, a new problem term — can be
+    applied to everything already read, without paying for OCR again and without leaving
+    records produced by the old rules sitting in the database next to records produced by
+    the new ones.
+    """
+    pages = cached_pages_for(config, document)
+    if not pages:
+        log.warning("no_cached_pages", document=document.title,
+                    note="nothing to re-extract; the page-text cache has no entry")
+        return {"document_id": document.id, "skipped": True}
+
+    stale_events = list(
+        session.execute(
+            select(DrillingEvent)
+            .where(DrillingEvent.document_id == document.id)
+            .where(DrillingEvent.extraction_method == "nlp_document_extraction")
+        ).scalars()
+    )
+    removed_mitigations = 0
+    for event in stale_events:
+        for mitigation in session.execute(
+            select(Mitigation).where(Mitigation.event_id == event.id)
+        ).scalars():
+            session.delete(mitigation)
+            removed_mitigations += 1
+        session.delete(event)
+    session.flush()
+
+    extracted = extractor.extract_from_pages(pages)
+    minimum_confidence = float(config.get("documents.nlp.min_confidence"))
+
+    stored_events = 0
+    stored_mitigations = 0
+    for event in extracted["events"]:
+        if event.confidence < minimum_confidence:
+            continue
+        record = DrillingEvent(
+            well_id=document.well_id,
+            occurred_at=None,
+            event_type=event.event_type,
+            category=event.category,
+            depth_start_m=event.depth_m,
+            depth_end_m=event.depth_m,
+            depth_source="document_text" if event.depth_m is not None else None,
+            formation_name=event.formation_name,
+            description=event.description,
+            raw_text=event.source_text,
+            extraction_confidence=event.confidence,
+            extraction_method="nlp_document_extraction",
+            document_id=document.id,
+            source_dataset="Sodir wellbore documents",
+            source_reference=f"{document.title} p.{event.page_number}",
+        )
+        session.add(record)
+        session.flush()
+        stored_events += 1
+
+        if event.actions:
+            session.add(
+                Mitigation(
+                    event_id=record.id,
+                    action_taken="; ".join(event.actions),
+                    outcome=event.outcome,
+                    outcome_status=event.outcome_status,
+                    raw_text=event.source_text,
+                    extraction_confidence=event.confidence,
+                    source_dataset="Sodir wellbore documents",
+                    source_reference=f"{document.title} p.{event.page_number}",
+                )
+            )
+            stored_mitigations += 1
+
+    session.flush()
+    result = {
+        "document_id": document.id,
+        "title": document.title,
+        "pages_from_cache": len(pages),
+        "events_removed": len(stale_events),
+        "mitigations_removed": removed_mitigations,
+        "events_stored": stored_events,
+        "mitigations_stored": stored_mitigations,
+        "mentions_excluded": len(extracted.get("excluded", [])),
+    }
+    log.info("document_reextracted", **result)
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Ingest well report documents")
     parser.add_argument("--well", action="append", default=None,
@@ -350,6 +466,12 @@ def main() -> int:
                              "narrative deeper in a report gets ingested.")
     parser.add_argument("--list", action="store_true",
                         help="list available documents without ingesting")
+    parser.add_argument("--reextract", action="store_true",
+                        help="re-run NLP extraction over already-OCR'd pages for the "
+                             "documents already stored. Rebuilds events and mitigations "
+                             "from the page-text cache without downloading or OCR'ing "
+                             "anything, so an extractor fix can be applied to everything "
+                             "already read.")
     args = parser.parse_args()
 
     config = get_config()
@@ -373,6 +495,36 @@ def main() -> int:
             for _, row in index.head(40).iterrows():
                 print(f"  {row['wlbName']:<12} {row['wlbDocumentType']:<24} "
                       f"{str(row['wlbDocumentSize']):>7} KB  {row['wlbDocumentName']}")
+            return 0
+
+        if args.reextract:
+            stored = list(session.execute(select(Document)).scalars())
+            if args.well:
+                wanted_ids = {
+                    wells[name].id for name in wells if name in {w.strip() for w in args.well}
+                }
+                stored = [d for d in stored if d.well_id in wanted_ids]
+            log.info("reextraction_start", documents=len(stored))
+            results = []
+            for document in stored:
+                try:
+                    results.append(reextract_document(session, config, document=document))
+                    session.commit()
+                except Exception as exc:
+                    session.rollback()
+                    log.error("document_reextract_failed", document=document.title,
+                              error=str(exc))
+            log.info(
+                "reextraction_complete",
+                documents=len(results),
+                events_stored=sum(r.get("events_stored", 0) for r in results),
+                mitigations_stored=sum(r.get("mitigations_stored", 0) for r in results),
+                mentions_excluded=sum(r.get("mentions_excluded", 0) for r in results),
+            )
+            report_path = ensure_dir("artifacts/profiling") / "document_reextraction.json"
+            report_path.write_text(
+                json.dumps(results, indent=2, default=str), encoding="utf-8"
+            )
             return 0
 
         # Largest documents first: they are the substantive completion reports.

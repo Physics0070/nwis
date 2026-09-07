@@ -77,6 +77,37 @@ ACTION_TERMS = [
     "milled", "washed over", "sidetracked", "plugged",
 ]
 
+# Cues that a problem term is being *denied* rather than reported.
+#
+# Drilling reports state absences constantly — "No tight spot", "no losses observed",
+# "hole free of fill". Matching the problem term alone turns those into evidence that
+# the problem occurred, which is precisely backwards: the report says it did not.
+#
+# Kept as data alongside the other lexicons so a drilling engineer can review and extend
+# the vocabulary without touching code.
+NEGATION_TERMS = [
+    "no", "not", "never", "none", "without", "free of", "free from",
+    "no sign of", "no signs of", "no indication of", "no indications of",
+    "no evidence of", "avoided", "prevented", "eliminated",
+]
+
+# Phrases naming a *planned* operation whose description happens to contain the
+# vocabulary of a problem. A leak-off test is a formation-integrity test, not a leak; a
+# kick drill is a rehearsal, not a well-control incident. Matching the bare term turns a
+# routine, successful operation into a recorded incident.
+#
+# A term is excluded only when the term itself falls inside one of these phrases, so
+# "casing leak" is still an equipment failure while "leak off test" is not.
+ROUTINE_OPERATION_TERMS = [
+    "leak off", "leak-off", "leakoff",
+    "kick drill", "kick sheet", "kick tolerance", "kick off",
+    "formation integrity test", "pressure integrity test",
+]
+
+# How many words may sit between the negation cue and the problem term. "no further
+# tight spots" is a denial; a cue three sentences back is not.
+NEGATION_WINDOW_WORDS = 3
+
 # Words that indicate how a situation resolved.
 OUTCOME_TERMS = {
     "regained": "resolved",
@@ -287,16 +318,63 @@ def _first_depth(sentence: str) -> float | None:
     return round(depth, 2) if 0 < depth <= 12000 else None
 
 
+@lru_cache(maxsize=1)
+def _negation_pattern() -> re.Pattern:
+    """Matches a negation cue followed, within a few words, by the position of a term."""
+    cues = "|".join(
+        re.escape(cue) for cue in sorted(NEGATION_TERMS, key=len, reverse=True)
+    )
+    return re.compile(
+        rf"\b(?:{cues})\b(?:\W+\w+){{0,{NEGATION_WINDOW_WORDS}}}\W*$",
+        re.IGNORECASE,
+    )
+
+
+def is_negated(sentence: str, term_start: int) -> bool:
+    """Is the problem term at ``term_start`` being denied rather than reported?
+
+    Looks only at the text preceding the term in its own sentence. A cue in a later
+    clause says nothing about this mention.
+    """
+    return bool(_negation_pattern().search(sentence[:term_start]))
+
+
+def routine_operation_span(sentence: str, term_start: int, term_length: int) -> str | None:
+    """The routine-operation phrase containing this term occurrence, if any.
+
+    Overlap is checked by span rather than by mere presence, so a sentence that mentions
+    both a leak-off test and a genuine problem does not lose the genuine one.
+    """
+    term_end = term_start + term_length
+    for phrase in ROUTINE_OPERATION_TERMS:
+        start = sentence.find(phrase)
+        while start != -1:
+            if start < term_end and term_start < start + len(phrase):
+                return phrase
+            start = sentence.find(phrase, start + 1)
+    return None
+
+
 def extract_events(
-    text: str, page_number: int, page_confidence: float | None
+    text: str,
+    page_number: int,
+    page_confidence: float | None,
+    excluded_out: list | None = None,
 ) -> list[ExtractedEvent]:
     """Problem statements, with any action and outcome stated nearby.
 
     Confidence is deliberately conservative: a term match in OCR text is evidence that
     something was mentioned, not proof that an incident occurred. Records reaching the
     database are always reviewable against ``source_text``.
+
+    Two kinds of mention are excluded: ones the report *denies* ("No tight spot"), and
+    ones that describe a *planned* operation whose name contains problem vocabulary ("leak
+    off test"). Pass ``excluded_out`` to collect them with the reason. They are counted
+    and reported rather than dropped in silence, because "we discarded N mentions, for
+    these reasons" is itself a reviewable claim about the extractor's behaviour.
     """
     events: list[ExtractedEvent] = []
+    excluded: list = excluded_out if excluded_out is not None else []
     base_confidence = page_confidence if page_confidence is not None else 0.5
     sentences = split_sentences(text)
 
@@ -309,6 +387,25 @@ def extract_events(
             continue
         # Prefer the most specific (longest) matching term.
         term, category = max(matched, key=lambda pair: len(pair[0]))
+
+        # "No tight spot" reports the absence of a problem. Storing it as a tight_hole
+        # event would put an incident in front of an engineer that the report explicitly
+        # says did not happen — the opposite of what the source states.
+        term_start = lowered.index(term)
+        if is_negated(lowered, term_start):
+            excluded.append(
+                (page_number, sentence.strip()[:200], category, "denied_by_report")
+            )
+            continue
+
+        # A planned operation is not an incident, even when its name contains the
+        # vocabulary of one.
+        routine = routine_operation_span(lowered, term_start, len(term))
+        if routine is not None:
+            excluded.append(
+                (page_number, sentence.strip()[:200], category, f"routine:{routine}")
+            )
+            continue
 
         # Look at the sentence and the one after it for a remedial action and outcome.
         window = " ".join(sentences[index : index + 2]).lower()
@@ -349,13 +446,18 @@ def extract_from_pages(pages: Iterable) -> dict[str, list]:
     """Run every extractor over a document's pages."""
     records: list[ExtractedRecord] = []
     events: list[ExtractedEvent] = []
+    excluded: list = []
 
     for page in pages:
         if page.is_empty:
             continue
         records.extend(extract_formation_intervals(page.text, page.page_number, page.confidence))
         records.extend(extract_measurements(page.text, page.page_number, page.confidence))
-        events.extend(extract_events(page.text, page.page_number, page.confidence))
+        events.extend(
+            extract_events(
+                page.text, page.page_number, page.confidence, excluded_out=excluded
+            )
+        )
 
     log.info(
         "extraction_complete",
@@ -363,5 +465,18 @@ def extract_from_pages(pages: Iterable) -> dict[str, list]:
         events=len(events),
         record_types=sorted({r.record_type for r in records}),
         event_categories=sorted({e.category for e in events}),
+        # Reported, not silently dropped. A report saying a problem did not occur must
+        # never become evidence that it did, and a planned test must never be recorded as
+        # a failure — but how often that was suppressed is itself a number worth seeing.
+        mentions_excluded=len(excluded),
+        exclusion_reasons=_count_reasons(excluded),
     )
-    return {"records": records, "events": events}
+    return {"records": records, "events": events, "excluded": excluded}
+
+
+def _count_reasons(excluded: list) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for entry in excluded:
+        reason = entry[3]
+        counts[reason] = counts.get(reason, 0) + 1
+    return dict(sorted(counts.items()))
