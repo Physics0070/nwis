@@ -2,7 +2,7 @@
 
 Living progress tracker. Status legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked/assumption recorded.
 
-Last updated: 2026-09-06 (session 1)
+Last updated: 2026-09-07
 
 ---
 
@@ -87,9 +87,9 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 11 — OCR / NLP knowledge ingestion
 
-- [~] Document ingestion pipeline (OCR + NLP built; first reports processing)
-- [~] Entity/event extraction with provenance + confidence (built, running)
-- [~] Knowledge records persisted (documents, chunks, events, mitigations)
+- [x] Document ingestion pipeline (OCR + NLP, page-text caching)
+- [x] Entity/event extraction with provenance + confidence
+- [x] Knowledge records persisted (2 docs, 75 chunks, 33 formations, 1 event)
 
 ## Phase 12 — Telemetry replay engine
 
@@ -147,6 +147,8 @@ Last updated: 2026-09-06 (session 1)
 | Database loaded | 101 wells, 1,449 formation intervals, 18,842 log samples, 86,800 telemetry rows, 154 trajectory stations, 184 events, 0 wells without a real position |
 | CRS cross-validated | Volve (NPD source) lands at 58.441N 1.886E; nearest FORCE well (independent source) is 15/9-17 at 3.6 km, same licence block 15/9 |
 | Analogue engine | Proven non-proximity: 16/10-1 at 36 km ranks top-5 on geology 0.9873 despite geography score 0.2372. All top matches share Tor Fm. |
+| Document ingestion | 60 pages OCR'd at 0.968 mean confidence; 33 formation intervals recovered from scanned 1980s completion reports |
+| OCR honesty | Only 1 problem event and 0 mitigations found in these pages: they are sample descriptions, not operations narrative. Reported, not padded |
 | Known limitation | Chalk -> Limestone 99.8%: carbonate family is not separable on the available curves. Documented, not hidden |
 
 ## Open items / risks

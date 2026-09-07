@@ -35,6 +35,9 @@ const CHANNELS: ChannelSpec[] = [
   { key: "surface_torque_knm", label: "Surface torque", unit: "kN·m", colour: "#e2703a" },
 ];
 
+// How far the bit must move before geological context is re-queried.
+const DEPTH_CONTEXT_STEP_M = 25;
+
 export default function ActiveWell() {
   const { wellId } = useParams();
   const id = Number(wellId);
@@ -44,11 +47,16 @@ export default function ActiveWell() {
   const { samples, latest, replayState, connection, lastError, setReplayState } =
     useTelemetryStream(Number.isFinite(id) ? id : null);
 
-  // Depth context follows the bit as the replay advances.
+  // Depth context follows the bit as the replay advances, but is quantised to a step.
+  // Re-querying analogues and risk on every 10-second sample would refetch continuously
+  // and leave those panels permanently in a loading state, which is worse than useless.
+  // The bit has to move a meaningful distance before the geological context can change.
   const currentDepth = latest?.bit_depth_m ?? replayState?.current_depth_m ?? null;
   const [contextDepth, setContextDepth] = useState<number | null>(null);
   useEffect(() => {
-    if (currentDepth !== null) setContextDepth(Math.round(currentDepth));
+    if (currentDepth === null) return;
+    const quantised = Math.round(currentDepth / DEPTH_CONTEXT_STEP_M) * DEPTH_CONTEXT_STEP_M;
+    setContextDepth((previous) => (previous === quantised ? previous : quantised));
   }, [currentDepth]);
 
   const nearby = useQuery({
@@ -61,12 +69,14 @@ export default function ActiveWell() {
     queryKey: ["analogues", id, contextDepth],
     queryFn: () => api.analogues(id, contextDepth),
     enabled: Number.isFinite(id),
+    placeholderData: (previous) => previous,
   });
 
   const risk = useQuery({
     queryKey: ["risk", id, contextDepth],
     queryFn: () => api.risk(id, contextDepth),
     enabled: Number.isFinite(id),
+    placeholderData: (previous) => previous,
   });
 
   const formations = useQuery({

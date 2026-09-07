@@ -364,6 +364,9 @@ embeddings:
 
 documents:
   raw_dir: "data/raw/documents"
+  # OCR is expensive (about a second per page per 100 DPI), so extracted page text is
+  # cached. Re-running extraction with improved NLP rules then costs nothing.
+  cache_dir: "data/interim/document_text"
 
   # Sodir document classes worth ingesting. "REPORTED BY LICENSEE" holds the completion
   # reports; the others are logs and plots with little narrative text.

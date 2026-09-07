@@ -36,7 +36,12 @@ export function useTelemetryStream(wellId: number | null, bufferSize = 300) {
     const socket = new WebSocket(telemetrySocketUrl(wellId));
     socketRef.current = socket;
 
-    socket.onopen = () => setConnection("open");
+    socket.onopen = () => {
+      setConnection("open");
+      // A previous attempt may have failed; a successful connection clears that state
+      // so the UI never shows a stale failure next to a live connection.
+      setLastError(null);
+    };
 
     socket.onmessage = (raw) => {
       try {
@@ -46,6 +51,7 @@ export function useTelemetryStream(wellId: number | null, bufferSize = 300) {
           return;
         }
         if (message.state) setReplayState(message.state as ReplayState);
+        setLastError(null);
         if (message.sample) {
           const sample = message.sample as TelemetrySample;
           const index = message.state?.current_index ?? 0;

@@ -98,13 +98,19 @@ OUTCOME_TERMS = {
 
 # ------------------------------------------------------------------------- patterns
 
-# "Utsira Formation (847 - 1053 m KB)" / "Hordaland Group 1053-1600 m"
+# "Utsira Formation (847 - 1053 m KB)" / "HORDALAND GROUP 1053-1600 m"
+#
+# Every word of the name must start with a capital. OCR of these reports runs prose and
+# headings together on one line, and an unanchored pattern walked backwards into the
+# preceding sentence, producing names like
+# "ite are seen throughout the section. Utsira Formation".
+# Case-sensitive on purpose: lower-case "formation" in running prose is a common noun.
 FORMATION_INTERVAL = re.compile(
-    r"(?P<name>[A-Z][A-Za-zaeoAEOÀ-ſ\s\-\.]{2,40}?\s+(?:Formation|Fm\.?|Group|Gp\.?))"
+    r"(?P<name>(?:[A-ZÅØÆ][A-Za-zÅØÆåøæ\-]{1,24}\s+){0,3}"
+    r"(?:FORMATION|Formation|GROUP|Group|Fm\.?|Gp\.?))"
     r"\s*[\(\[]?\s*"
     r"(?P<top>\d{1,5}(?:[.,]\d+)?)\s*(?:-|–|to)\s*(?P<base>\d{1,5}(?:[.,]\d+)?)"
     r"\s*(?P<unit>m|meters|metres|ft|feet)\b",
-    re.IGNORECASE,
 )
 
 # A depth mentioned in prose: "at 2345 m", "@ 1200 mMD", "3510 m KB"
@@ -211,6 +217,8 @@ def extract_formation_intervals(
         if base <= top or base > 12000:
             continue  # not a plausible interval; discard rather than store nonsense
         name = re.sub(r"\s+", " ", match.group("name")).strip()
+        if name.lower().rstrip(".") in {"formation", "group", "fm", "gp"}:
+            continue  # the bare keyword with no name attached is not a formation
         records.append(
             ExtractedRecord(
                 record_type="formation_interval",

@@ -31,6 +31,7 @@ from backend.app.models import (
     Document,
     DocumentChunk,
     DrillingEvent,
+    FormationInterval,
     Mitigation,
     Well,
 )
@@ -195,9 +196,42 @@ def ingest_document(session, config, *, well: Well, row: pd.Series, max_pages: i
             )
             stored_mitigations += 1
 
+    # Formation tops with depth intervals are the highest-value knowledge in these
+    # reports, so they become first-class stratigraphy rows rather than free text.
+    # They are marked as document-derived, keeping them distinguishable from the
+    # FORCE-derived intervals, and a duplicate interval is not inserted twice.
     formation_records = [
         r for r in extracted["records"] if r.record_type == "formation_interval"
     ]
+    stored_formations = 0
+    for record in formation_records:
+        if record.confidence < minimum_confidence:
+            continue
+        name = record.value["formation_name"]
+        top = record.value["depth_top_m"]
+        base = record.value["depth_base_m"]
+        already = session.execute(
+            select(FormationInterval)
+            .where(FormationInterval.well_id == well.id)
+            .where(FormationInterval.formation_name == name)
+            .where(FormationInterval.depth_top_m == top)
+        ).scalars().first()
+        if already is not None:
+            continue
+        session.add(
+            FormationInterval(
+                well_id=well.id,
+                group_name=None,
+                formation_name=name,
+                depth_top_m=top,
+                depth_base_m=base,
+                sample_count=None,
+                source_dataset="Sodir wellbore documents",
+                source_reference=f"{title} p.{record.page_number} "
+                                 f"(confidence {record.confidence})",
+            )
+        )
+        stored_formations += 1
 
     session.flush()
     result = {
@@ -209,6 +243,7 @@ def ingest_document(session, config, *, well: Well, row: pd.Series, max_pages: i
         "events_stored": stored_events,
         "mitigations_stored": stored_mitigations,
         "formation_intervals_found": len(formation_records),
+        "formation_intervals_stored": stored_formations,
         "records_found": len(extracted["records"]),
     }
     log.info("document_ingested", **{k: v for k, v in result.items() if k != "methods"})
@@ -273,6 +308,7 @@ def main() -> int:
             "documents_ingested": len(ingested),
             "events_stored": sum(r.get("events_stored", 0) for r in ingested),
             "mitigations_stored": sum(r.get("mitigations_stored", 0) for r in ingested),
+            "formations_stored": sum(r.get("formation_intervals_stored", 0) for r in ingested),
             "chunks": sum(r.get("chunks", 0) for r in ingested),
             "characters": sum(r.get("characters", 0) for r in ingested),
         }

@@ -15,6 +15,7 @@ Nothing downstream is allowed to treat OCR output as though it were certain.
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
@@ -123,16 +124,39 @@ def _ocr_image(image: np.ndarray) -> tuple[str, float | None, int]:
     )
 
 
+def _cache_path(pdf_path, max_pages: int | None, start_page: int):
+    """Where the page text for this extraction is cached."""
+    from nwis_common.paths import ensure_dir
+
+    directory = ensure_dir(get_config().get("documents.cache_dir"))
+    stem = Path(pdf_path).stem
+    return directory / f"{stem}__p{start_page}_{max_pages}.json"
+
+
 def extract_pages(
     pdf_path,
     *,
     max_pages: int | None = None,
     start_page: int = 0,
+    use_cache: bool = True,
 ) -> list[PageText]:
-    """Extract text from a PDF, using the text layer where present and OCR where not."""
+    """Extract text from a PDF, using the text layer where present and OCR where not.
+
+    OCR costs roughly a second per page per 100 DPI, so page text is cached to disk.
+    Re-running extraction to improve the NLP rules then costs nothing, which matters
+    because the extraction patterns are expected to be iterated on.
+    """
+    import json
+
     import pymupdf
 
     config = get_config()
+
+    cache_file = _cache_path(pdf_path, max_pages, start_page)
+    if use_cache and cache_file.exists():
+        payload = json.loads(cache_file.read_text(encoding="utf-8"))
+        log.info("page_text_cache_hit", file=cache_file.name, pages=len(payload))
+        return [PageText(**entry) for entry in payload]
     dpi = int(config.get("documents.ocr.dpi"))
     min_text_chars = int(config.get("documents.ocr.min_text_layer_chars"))
 
@@ -191,6 +215,12 @@ def extract_pages(
         )
 
     document.close()
+
+    if use_cache:
+        cache_file.write_text(
+            json.dumps([p.__dict__ for p in pages], indent=1), encoding="utf-8"
+        )
+        log.info("page_text_cached", file=cache_file.name, pages=len(pages))
     return pages
 
 
