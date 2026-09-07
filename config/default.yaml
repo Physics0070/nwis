@@ -161,11 +161,75 @@ lithology_model:
 
 volve_pipeline:
   # Log objects to ingest, resolved against what the WITSML files actually contain.
-  preferred_log_names: ["GenTime", "GwdTime", "GenTime2", "Hydraulics"]
+  # CementData / GasTime / Pits are separate operations and are excluded from the
+  # drilling telemetry stream.
+  preferred_log_names: ["GenTime", "GenTime2", "GwdTime", "Hydraulics"]
+  index_type: "date time"
   resample_seconds: 10
   min_valid_fraction: 0.10
   unit_conversions:
     enabled: true
+
+  # Canonical telemetry channel <- first matching WITSML mnemonic.
+  # Verified present in all three wells; resolved at runtime against each log, so a
+  # missing mnemonic degrades that channel to null instead of failing the pipeline.
+  channel_map:
+    hole_depth_m:            ["Depth", "MDEPTH"]
+    bit_depth_m:             ["BITDEP"]
+    rop_m_per_hr:            ["ROP_AVG"]
+    weight_on_bit_kn:        ["WOB_AVG", "WOB"]
+    surface_torque_knm:      ["TORQUE_AVG"]
+    surface_rpm:             ["SURF_RPM"]
+    bit_rpm:                 ["BIT_RPM_AVG", "BIT_RPM"]
+    standpipe_pressure_bar:  ["PUMP", "PUMP2"]
+    flow_in_lpm:             ["FLOWIN"]
+    flow_out_lpm:            ["FLOWOUT"]
+    hookload_kn:             ["HKLD_AVG", "HKLD"]
+    mse_bar:                 ["MSE", "I_MSE"]
+    mud_weight_in_sg:        ["MWIN"]
+    mud_weight_out_sg:       ["MWOUT"]
+    pit_gain_loss_m3:        ["GAINLOSSTOT"]
+    total_gas:               ["TOTGAS"]
+    mud_temp_in_c:           ["MTIN"]
+    mud_temp_out_c:          ["MTOUT"]
+    block_position_m:        ["BLOCKCOMP"]
+    rig_activity_code:       ["RigActivityCode"]
+
+  # Zero is an operational state in this dataset (pumps off, string static), not a null,
+  # so zeros are never blanket-removed. Activity is expressed as explicit flags.
+  #
+  # Measured fact about this mirror: the `Depth` channel is a CONSTANT equal to wellbore
+  # total depth, not live hole depth, so an on-bottom test is not derivable. Activity is
+  # therefore inferred from signals that genuinely vary: flow, rotation and string
+  # movement. See docs/ASSUMPTIONS.md A10.
+  activity:
+    min_flow_in_lpm: 100.0
+    min_bit_rpm: 5.0
+    min_trip_speed_m_per_min: 0.5    # absolute rate of change of bit depth
+    # A row counts as operationally active if ANY of these hold.
+    active_states: ["circulating", "rotating", "tripping"]
+    # A channel whose values never change carries no information and is reported.
+    constant_channel_tolerance: 1.0e-9
+
+  # Values outside these ranges are physically implausible; they are flagged and
+  # counted in the quality report, never silently deleted.
+  plausible_ranges:
+    hole_depth_m:           [0.0, 10000.0]
+    bit_depth_m:            [0.0, 10000.0]
+    rop_m_per_hr:           [0.0, 500.0]
+    weight_on_bit_kn:       [-50.0, 500.0]
+    surface_torque_knm:     [-5.0, 100.0]
+    surface_rpm:            [0.0, 350.0]
+    bit_rpm:                [0.0, 400.0]
+    standpipe_pressure_bar: [0.0, 700.0]
+    flow_in_lpm:            [0.0, 10000.0]
+    flow_out_lpm:           [0.0, 10000.0]
+    hookload_kn:            [0.0, 5000.0]
+    mud_weight_in_sg:       [0.8, 3.0]
+    mud_weight_out_sg:      [0.8, 3.0]
+    mud_temp_in_c:          [-10.0, 150.0]
+    mud_temp_out_c:         [-10.0, 150.0]
+    trip_speed_m_per_min:   [0.0, 90.0]      # faster than any real hoisting speed
 
 telemetry:
   # Rolling windows expressed in samples at the resampled rate above.

@@ -428,24 +428,71 @@ def main() -> int:
             holdout_macro_f1=metrics.get("leaderboard_holdout", {}).get("macro_f1"),
         )
 
-    # Selection on validation only, never on test.
-    if results:
-        best = max(results, key=lambda k: results[k]["validation"].get("macro_f1", 0.0))
-        (artifacts_dir / "selected.json").write_text(
-            json.dumps(
-                {
-                    "selected_model": best,
-                    "selection_metric": "validation macro F1",
-                    "candidates": {
-                        k: v["validation"].get("macro_f1") for k, v in results.items()
-                    },
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        log.info("model_selected", selected=best,
-                 validation_macro_f1=results[best]["validation"].get("macro_f1"))
+    # Selection on validation only, never on test or the external holdout.
+    # Every registered version is considered, not just the ones trained in this run, so
+    # training a single candidate cannot silently promote it over a better stored model.
+    if not args.smoke:
+        candidates_seen: dict[str, dict] = {}
+        for version in registry.list_versions(MODEL_NAME):
+            record = json.loads(
+                (registry.model_dir(MODEL_NAME) / f"{version}.json").read_text(encoding="utf-8")
+            )
+            if record.get("status") != "trained":
+                continue
+            algorithm = record["algorithm"]
+            score = record["metrics"].get("validation", {}).get("macro_f1")
+            if score is None:
+                continue
+            previous = candidates_seen.get(algorithm)
+            if previous is None or record["trained_at"] > previous["trained_at"]:
+                candidates_seen[algorithm] = {
+                    "validation_macro_f1": score,
+                    "test_macro_f1": record["metrics"].get("test", {}).get("macro_f1"),
+                    "holdout_macro_f1": record["metrics"]
+                    .get("leaderboard_holdout", {})
+                    .get("macro_f1"),
+                    "trained_at": record["trained_at"],
+                    "version": version,
+                }
+
+        if candidates_seen:
+            best = max(
+                candidates_seen, key=lambda k: candidates_seen[k]["validation_macro_f1"]
+            )
+            # Flag when the unseen-well estimates disagree with the selection: that is a
+            # symptom of well-to-well variance, and hiding it would overstate confidence.
+            holdout_best = max(
+                (k for k in candidates_seen if candidates_seen[k]["holdout_macro_f1"]),
+                key=lambda k: candidates_seen[k]["holdout_macro_f1"],
+                default=None,
+            )
+            selection = {
+                "selected_model": best,
+                "selection_metric": "validation macro F1",
+                "selection_rule": "validation wells only; test and external holdout are "
+                                  "never consulted for selection",
+                "candidates": candidates_seen,
+            }
+            if holdout_best and holdout_best != best:
+                selection["disagreement_warning"] = (
+                    f"{best!r} wins on validation but {holdout_best!r} scores higher on "
+                    "the external holdout wells. The two unseen-well estimates disagree, "
+                    "which indicates high well-to-well variance rather than a clear "
+                    "winner. Grouped cross-validation over training wells would give a "
+                    "more stable selection."
+                )
+                log.warning("selection_disagreement",
+                            validation_winner=best, holdout_winner=holdout_best)
+
+            (artifacts_dir / "selected.json").write_text(
+                json.dumps(selection, indent=2), encoding="utf-8"
+            )
+            log.info(
+                "model_selected",
+                selected=best,
+                validation_macro_f1=candidates_seen[best]["validation_macro_f1"],
+                considered=sorted(candidates_seen),
+            )
     return 0
 
 

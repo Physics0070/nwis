@@ -144,3 +144,52 @@ credible, since drilling data could not be sent to a third-party service.
 The project root is `D:\SOHAM ALL\hackathons\SIH`, alongside the pre-existing submission
 files. Those binaries (`*.pptx`, `*.xlsx`) are git-ignored: they remain on disk but stay out
 of version control.
+
+---
+
+## A10 - The Volve WITSML mirror is completion/workover data, not drilling-ahead
+
+**Observed.** After parsing all 312 XML files into 86,800 normalised telemetry rows:
+
+- `ROP_AVG` is **0.00 in every row of all three wells** - the rate-of-penetration channel
+  is constant zero, because no drilling-ahead took place during these recordings.
+- `MSE` (mechanical specific energy) is likewise constant.
+- The `Depth` channel is a **constant** equal to wellbore total depth (F-4: 3510 m,
+  F-7: 1083 m, F-9: 1206 m), not live hole depth. Only `BITDEP` varies.
+- WITSML `message` records carry that same constant as their `md`, so they are not
+  usefully depth-tagged as published.
+- Message text is unambiguous: "pull tubing", "P/U spear and set spear in 7 5/8 Tubing",
+  "rih with tubing", "pooh with RT and 5 1/2 DP", "BOP test", cementing operations.
+- Recording windows are short: F-4 seven days (Sep-Oct 2016), F-7 two days, F-9 1.5 days.
+
+These are **completion, workover and plug-and-abandonment campaigns** on the Volve field
+during its final years, not exploration drilling.
+
+**Consequences, and what was done about each.**
+
+1. **No on-bottom test is derivable.** `hole_depth - bit_depth` would be computed against
+   a constant, producing an artefact. It is therefore not computed. Rig state is inferred
+   only from signals that genuinely vary: flow (`circulating`), rotation (`rotating`) and
+   rate of change of bit depth (`tripping`). 8,130 of 86,800 rows are operationally
+   active.
+
+2. **Message depths are recovered, not invented.** Each remark is matched to the nearest
+   telemetry sample within 10 minutes, giving real depths (F-4 spans 0-3510 m instead of a
+   single constant). Both the reported and recovered values are retained, along with a
+   `depth_source` column, so the substitution is auditable. All 184 messages resolved.
+
+3. **Constant channels are reported, not fed to models.** `rop_m_per_hr`, `mse_bar` and
+   the mud-weight channels are detected automatically as zero-variance and listed in the
+   quality report. A feature with no variance contributes nothing and would only pad an
+   impressive-looking feature count.
+
+4. **Anomaly detection is scoped honestly.** The anomaly model describes *rig operational
+   behaviour* - tripping, circulating, pressure testing, cementing - using hookload,
+   standpipe pressure, flow, torque, RPM, pit gain/loss and string movement, all of which
+   vary meaningfully. It is **not** a drilling-ahead ROP/WOB optimiser, and NWIS must not
+   describe it as one.
+
+**What would change this.** The full Equinor Volve release (~5 TB, ~40,000 files) contains
+drilling-phase WITSML for other wellbores. Ingesting a drilling-ahead subset would restore
+ROP/WOB/MSE behaviour. The pipeline needs no change to accept it - the channel map already
+resolves those mnemonics, they are simply constant in this mirror.

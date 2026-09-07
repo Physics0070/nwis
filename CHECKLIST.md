@@ -34,7 +34,7 @@ Last updated: 2026-09-06 (session 1)
 - [x] Reproducible download scripts (FORCE, Volve, NPD coordinates)
 - [x] FORCE profiling report (wells, curves, missingness, class balance, depth ranges)
 - [x] Volve WITSML profiling report (3 wells, 781,558 log rows, units audited)
-- [~] Data-quality validation rules + report (FORCE rules live; Volve pending)
+- [x] Data-quality validation rules + report (FORCE + Volve; implausible values flagged not deleted)
 
 ## Phase 3 — FORCE preprocessing
 
@@ -43,7 +43,7 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 4 — FORCE lithology model
 
-- [x] Random Forest baseline (retraining with lighter config after 10.1 h / 901 MB first attempt)
+- [x] Random Forest baseline - retuned: 291 s / 179 MB (was 36,280 s / 901 MB), same metrics
 - [x] XGBoost on RTX 4050 — 196 s, early stopping on macro F1, class-balanced
 - [x] Evaluation on unseen wells — internal 15-well test + official 10-well FORCE holdout
 - [x] Model registry entry + metrics persisted (no invented numbers)
@@ -52,8 +52,8 @@ Last updated: 2026-09-06 (session 1)
 ## Phase 5 — Volve preprocessing
 
 - [x] WITSML parser (log, trajectory, message, bhaRun, wellInfo)
-- [ ] Normalised telemetry schema + unit conversion
-- [ ] Cleaned/aligned telemetry dataset
+- [x] Normalised telemetry schema + unit conversion (20 channels, SI -> driller units)
+- [x] Cleaned/aligned telemetry dataset (86,800 rows @10 s, 8,130 operationally active)
 
 ## Phase 6 — Telemetry feature engineering
 
@@ -142,6 +142,8 @@ Last updated: 2026-09-06 (session 1)
 | External holdout | FORCE leaderboard set: 136,786 rows across 10 wells absent from training |
 | Volve profiled | 3 wells, 781,558 log rows; messages carry total depth only, so event depth must be recovered by time-join |
 | **Lithology model** | **XGBoost (GPU, 196 s): holdout accuracy 0.7498, macro F1 0.3852, kappa 0.5659, FORCE penalty 0.6322** vs majority baseline 0.6139 / 0.0761 |
+| Volve reality check | Mirror is completion/workover, not drilling-ahead: ROP constant 0, Depth constant. Scoped honestly (see A10) |
+| Message depths | All 184 remarks given real depths by time-join to telemetry (were all constant total depth) |
 | Known limitation | Chalk -> Limestone 99.8%: carbonate family is not separable on the available curves. Documented, not hidden |
 
 ## Open items / risks
