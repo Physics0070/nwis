@@ -24,7 +24,7 @@ Last updated: 2026-09-06 (session 1)
 - [x] SQLAlchemy models: 16 tables (wells, trajectories, logs, formations,
       lithology_predictions, telemetry, anomalies, events, mitigations, risk,
       alerts, embeddings, documents, chunks, engineer_actions, model_versions)
-- [~] Schema created via SQLAlchemy metadata; Alembic scaffold pending
+- [x] Alembic migration (dialect-aware: hypertable + GIST + ivfflat on Postgres)
 - [x] Storage adapter layer — dialect-adaptive types + runtime capability detection
 - [x] `docker-compose.yml` (postgres+postgis+timescale+pgvector, backend, frontend)
 - [x] Database bring-up verified (16 tables, honest fallback reporting)
@@ -87,9 +87,9 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 11 — OCR / NLP knowledge ingestion
 
-- [ ] Document ingestion pipeline
-- [ ] Entity/event extraction with provenance + confidence
-- [ ] Knowledge records persisted
+- [~] Document ingestion pipeline (OCR + NLP built; first reports processing)
+- [~] Entity/event extraction with provenance + confidence (built, running)
+- [~] Knowledge records persisted (documents, chunks, events, mitigations)
 
 ## Phase 12 — Telemetry replay engine
 
@@ -122,11 +122,11 @@ Last updated: 2026-09-06 (session 1)
 ## Phase 17 — Testing
 
 - [x] Backend tests: 31 passing, 2 skipped
-- [ ] Frontend: critical component tests
+- [x] Frontend tests: 14 passing (missing-value rendering, level vocabulary, formatting)
 
 ## Phase 18 — Docs & Docker demo
 
-- [~] README, SETUP, API, MODEL_CARD, ASSUMPTIONS written; ARCHITECTURE/DATA_PIPELINE/ML/DEMO pending
+- [x] README, ARCHITECTURE, DATA_PIPELINE, ML, API, SETUP, DEMO, MODEL_CARD, ASSUMPTIONS
 - [ ] `docker compose up --build` verified
 
 ---

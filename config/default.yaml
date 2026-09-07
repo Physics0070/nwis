@@ -363,14 +363,34 @@ embeddings:
   batch_size: 32
 
 documents:
+  raw_dir: "data/raw/documents"
+
+  # Sodir document classes worth ingesting. "REPORTED BY LICENSEE" holds the completion
+  # reports; the others are logs and plots with little narrative text.
+  wanted_document_types:
+    - "REPORTED BY LICENSEE"
+
+  # Real completion reports run to ~200 scanned pages and OCR costs roughly a second per
+  # page per 100 DPI. Bounded so ingestion is a predictable batch job rather than an
+  # open-ended one; raise it for a full back-catalogue run.
+  max_pages_per_document: 40
+
   ocr:
     enabled: true
-    tesseract_cmd: null         # null = use PATH
+    engine: "auto"              # auto | tesseract | rapidocr
+    tesseract_cmd: null         # null = look on PATH
     language: "eng"
-    dpi: 300
+    dpi: 200
+    # A page with at least this much embedded text is read directly; OCR is only used
+    # when a page is genuinely a scan.
+    min_text_layer_chars: 80
+
   nlp:
     spacy_model: "en_core_web_sm"
+    # Extraction confidence below this is not written to the database. Records are still
+    # counted in the ingestion report, so nothing disappears silently.
     min_confidence: 0.35
+
   chunk:
     size_chars: 1200
     overlap_chars: 150
