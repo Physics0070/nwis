@@ -228,3 +228,52 @@ def test_comparison_of_a_single_candidate_makes_no_claim():
     result = compare({"random_forest": [{"macro_f1": 0.3, "fit_seconds": 1.0}]})
     assert "comparison" not in result
     assert result["ranking"] == ["random_forest"]
+
+
+# ------------------------------------------------- ingesting deeper pages of a report
+
+
+def test_chunking_covers_the_page_without_losing_text():
+    """Overlapping windows must tile the page, not drop the tail."""
+    from data_pipeline.documents.ingest import chunk_text
+
+    text = "".join(f"sentence {i}. " for i in range(400))
+    chunks = chunk_text(text, size=1200, overlap=150)
+
+    assert len(chunks) > 1
+    assert text.startswith(chunks[0])
+    assert text.endswith(chunks[-1])
+    # Consecutive windows overlap, so a phrase on a boundary is retrievable from one
+    # of them rather than being split beyond recognition in both.
+    assert chunks[0][-150:] in chunks[1]
+
+
+def test_chunking_discards_a_blank_page_rather_than_storing_an_empty_passage():
+    from data_pipeline.documents.ingest import chunk_text
+
+    assert chunk_text("", 1200, 150) == []
+    assert chunk_text("   \n  \n", 1200, 150) == []
+
+
+def test_page_ranges_are_cached_separately_so_a_deeper_pass_is_a_new_read():
+    """The OCR cache key must include the page range, or a deeper pass would be served
+    the shallow pass's text."""
+    from data_pipeline.documents.ocr import _cache_path
+
+    shallow = _cache_path("report.pdf", 30, 0)
+    deep = _cache_path("report.pdf", 167, 30)
+    assert shallow != deep
+    assert "p0_30" in shallow.name
+    assert "p30_167" in deep.name
+
+
+def test_ingest_exposes_a_start_page_argument():
+    """The OCR layer always supported start_page; the CLI must too, or the drilling
+    narrative deeper in a report is unreachable."""
+    import inspect
+
+    from data_pipeline.documents.ingest import ingest_document
+
+    signature = inspect.signature(ingest_document)
+    assert "start_page" in signature.parameters
+    assert signature.parameters["start_page"].default == 0
