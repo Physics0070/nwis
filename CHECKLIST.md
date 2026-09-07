@@ -62,8 +62,8 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 7 — Anomaly detection
 
-- [ ] Isolation Forest training + evaluation
-- [ ] Contributing-feature attribution
+- [x] Isolation Forest trained (121 features, 8,130 active rows, 1.05 s)
+- [x] Contributing-feature attribution wired into risk payload
 - [ ] Persisted anomaly results
 
 ## Phase 8 — Contextual analogue engine
@@ -81,9 +81,9 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 10 — Risk engine
 
-- [ ] Label sufficiency assessment (supervised vs. hybrid indicator)
-- [ ] Risk scoring combining anomaly + analogue evidence + rules
-- [ ] Explainability payload
+- [x] Label sufficiency assessment — auto-resolves to hybrid_indicator (0 labelled events)
+- [x] Risk scoring: anomaly + historical evidence + configurable rules
+- [x] Explainability payload with evidence, components, narrative, notes
 
 ## Phase 11 — OCR / NLP knowledge ingestion
 
@@ -93,14 +93,14 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 12 — Telemetry replay engine
 
-- [ ] Replay from real cleaned telemetry (start/pause/resume/stop/speed)
-- [ ] Backend-owned replay state
+- [x] Replay from real telemetry (start/pause/resume/stop/speed/seek)
+- [x] Backend-owned replay state
 
 ## Phase 13 — FastAPI integration
 
-- [ ] REST endpoints (wells, nearby, analogues, events, telemetry, lithology, risk, alerts, mitigations, models, actions)
-- [ ] OpenAPI docs
-- [ ] Error handling + graceful degradation states
+- [x] REST endpoints (wells, nearby, analogues, events, telemetry, lithology, risk, alerts, mitigations, models, actions, status)
+- [x] OpenAPI docs (FastAPI auto-generated at /docs)
+- [x] Error handling + graceful degradation (sanitised errors, explicit unavailable states)
 
 ## Phase 14 — Frontend
 
@@ -112,12 +112,12 @@ Last updated: 2026-09-06 (session 1)
 
 ## Phase 15 — Real-time WebSocket
 
-- [ ] `/ws/telemetry/{well_id}` streaming
+- [x] `/ws/telemetry/{well_id}` streaming verified
 - [ ] Live anomaly/risk overlay
 
 ## Phase 16 — Feedback loop
 
-- [ ] Engineer action capture → institutional memory
+- [x] Engineer action capture -> institutional memory (POST /api/engineer-actions)
 
 ## Phase 17 — Testing
 

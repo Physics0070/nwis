@@ -263,6 +263,12 @@ telemetry:
 
 anomaly:
   model: "isolation_forest"
+  # Channels fed to the detector. Resolved against what the telemetry actually contains;
+  # zero-variance channels are detected and excluded automatically.
+  channels: ["standpipe_pressure_bar", "flow_in_lpm", "flow_out_lpm", "hookload_kn",
+             "surface_torque_knm", "bit_rpm", "surface_rpm", "weight_on_bit_kn",
+             "pit_gain_loss_m3", "bit_depth_m", "trip_speed_m_per_min",
+             "mud_temp_in_c", "mud_temp_out_c"]
   isolation_forest:
     n_estimators: 200
     contamination: 0.02
@@ -321,6 +327,16 @@ risk:
     min_analogue_similarity: 0.50
     min_supporting_wells: 1
 
+  # Deterministic checks on current measurements, so an obviously dangerous reading is
+  # never masked by a model that happens to find it statistically unremarkable.
+  # Bounds are operational limits for this dataset, not universal drilling limits.
+  rules:
+    standpipe_pressure_bar: {max: 350.0}
+    pit_gain_loss_m3:       {min: -20.0, max: 20.0}
+    surface_torque_knm:     {max: 40.0}
+    hookload_kn:            {max: 2500.0}
+    trip_speed_m_per_min:   {max: 60.0}
+
 alerts:
   thresholds:                   # applied to combined risk score in [0, 1]
     INFO: 0.0
@@ -328,6 +344,8 @@ alerts:
     MEDIUM: 0.45
     HIGH: 0.65
     CRITICAL: 0.85
+  # Levels below this are recorded as assessments but never raise an alert.
+  minimum_level_to_raise: "MEDIUM"
   cooldown_seconds: 300
   dedupe_depth_window_m: 25.0
   max_active_alerts_per_well: 20
