@@ -11,6 +11,7 @@ Usage:
     python -m data_pipeline.documents.ingest --list
     python -m data_pipeline.documents.ingest --well 15/9-13
     python -m data_pipeline.documents.ingest --limit 3 --max-pages 40
+    python -m data_pipeline.documents.ingest --start-page 30 --max-pages 202
 """
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import httpx
 import pandas as pd
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from backend.app.core.database import session_scope
 from backend.app.models import (
@@ -93,50 +94,119 @@ def chunk_text(text: str, size: int, overlap: int) -> list[str]:
     return [c for c in chunks if c.strip()]
 
 
-def ingest_document(session, config, *, well: Well, row: pd.Series, max_pages: int) -> dict:
-    """Download, read and extract knowledge from one report."""
+def _deepest_page_ingested(session, document_id: int) -> int:
+    """The highest page number already stored for a document.
+
+    Derived from the stored chunks rather than from ``page_count`` because a document can
+    be ingested in several passes over different page ranges. Pages that produced no text
+    leave no chunk, so this can understate the pages *read* — re-reading such a page on a
+    later pass is free (the OCR cache holds it) and stores nothing twice.
+    """
+    return int(
+        session.execute(
+            select(func.max(DocumentChunk.page_number)).where(
+                DocumentChunk.document_id == document_id
+            )
+        ).scalar()
+        or 0
+    )
+
+
+def ingest_document(
+    session,
+    config,
+    *,
+    well: Well,
+    row: pd.Series,
+    max_pages: int,
+    start_page: int = 0,
+) -> dict:
+    """Download, read and extract knowledge from one report.
+
+    ``start_page`` is a zero-based page offset. The first thirty pages of these reports
+    are geological sample descriptions; the drilling-operations narrative — where
+    problem, action and outcome chains actually live — is deeper in. Passing a
+    ``start_page`` past an already-ingested range **extends** the stored document rather
+    than skipping it or creating a duplicate.
+    """
     raw_dir = ensure_dir(config.get("documents.raw_dir"))
     url = str(row["wlbDocumentUrl"])
     title = str(row.get("wlbDocumentName") or row.get("wlbDocumentType") or "document")
     filename = f"{_slugify(well.name)}__{_slugify(title)}.pdf"
     path = raw_dir / filename
 
-    existing = session.execute(
+    document = session.execute(
         select(Document).where(Document.file_path == str(path))
     ).scalars().first()
-    if existing is not None:
-        log.info("document_already_ingested", document=title, well=well.name)
+    extending = document is not None
+    already_ingested_to = _deepest_page_ingested(session, document.id) if extending else 0
+
+    if extending and start_page + 1 <= already_ingested_to:
+        log.info(
+            "document_already_ingested",
+            document=title,
+            well=well.name,
+            pages_stored_to=already_ingested_to,
+            note=f"pass --start-page {already_ingested_to} or higher to read deeper",
+        )
         return {"skipped": True}
 
     if download_document(url, path) is None:
         return {"failed": True}
 
     log.info("document_reading", well=well.name, title=title[:60],
-             size_mb=round(path.stat().st_size / 1e6, 1), max_pages=max_pages)
+             size_mb=round(path.stat().st_size / 1e6, 1),
+             start_page=start_page, max_pages=max_pages, extending=extending)
 
-    pages = extract_pages(path, max_pages=max_pages)
+    pages = extract_pages(path, max_pages=max_pages, start_page=start_page)
+    if extending:
+        # Guard against overlap even when the caller passes a range that reaches back
+        # into stored pages: a chunk is never written for the same page twice.
+        pages = [p for p in pages if p.page_number > already_ingested_to]
+        if not pages:
+            log.info("no_new_pages", document=title, pages_stored_to=already_ingested_to)
+            return {"skipped": True}
+
     provenance = summarise(pages)
     if provenance["pages_with_text"] == 0:
         log.warning("document_unreadable", document=title,
                     note="no text layer and OCR produced nothing")
         return {"failed": True}
 
-    document = Document(
-        title=title,
-        document_type=str(row.get("wlbDocumentType") or "unknown"),
-        well_id=well.id,
-        file_path=str(path),
-        page_count=provenance["pages_processed"],
-        ocr_applied=any(p.method != "pdf_text_layer" for p in pages),
-        ingested_characters=provenance["characters"],
-    )
-    session.add(document)
+    if extending:
+        document.page_count = (document.page_count or 0) + provenance["pages_processed"]
+        document.ingested_characters = (
+            (document.ingested_characters or 0) + provenance["characters"]
+        )
+        document.ocr_applied = document.ocr_applied or any(
+            p.method != "pdf_text_layer" for p in pages
+        )
+    else:
+        document = Document(
+            title=title,
+            document_type=str(row.get("wlbDocumentType") or "unknown"),
+            well_id=well.id,
+            file_path=str(path),
+            page_count=provenance["pages_processed"],
+            ocr_applied=any(p.method != "pdf_text_layer" for p in pages),
+            ingested_characters=provenance["characters"],
+        )
+        session.add(document)
     session.flush()
 
     # ---- retrievable passages ------------------------------------------------
     chunk_size = int(config.get("documents.chunk.size_chars"))
     overlap = int(config.get("documents.chunk.overlap_chars"))
-    chunk_index = 0
+    # Continue the existing numbering; (document_id, chunk_index) is unique.
+    chunk_index = int(
+        session.execute(
+            select(func.max(DocumentChunk.chunk_index)).where(
+                DocumentChunk.document_id == document.id
+            )
+        ).scalar()
+        or -1
+    ) + 1
+    chunks_added = 0
     for page in pages:
         for passage in chunk_text(page.text, chunk_size, overlap):
             session.add(
@@ -149,6 +219,7 @@ def ingest_document(session, config, *, well: Well, row: pd.Series, max_pages: i
                 )
             )
             chunk_index += 1
+            chunks_added += 1
 
     # ---- structured knowledge -------------------------------------------------
     extracted = extractor.extract_from_pages(pages)
@@ -158,6 +229,17 @@ def ingest_document(session, config, *, well: Well, row: pd.Series, max_pages: i
     stored_mitigations = 0
     for event in extracted["events"]:
         if event.confidence < minimum_confidence:
+            continue
+        # Extending a document re-reads pages whose text produced no chunk, so the same
+        # extracted event can surface twice. Identity is the document, the page and the
+        # exact source text it came from.
+        duplicate = session.execute(
+            select(DrillingEvent)
+            .where(DrillingEvent.document_id == document.id)
+            .where(DrillingEvent.raw_text == event.source_text)
+            .where(DrillingEvent.event_type == event.event_type)
+        ).scalars().first()
+        if duplicate is not None:
             continue
         record = DrillingEvent(
             well_id=well.id,
@@ -239,7 +321,10 @@ def ingest_document(session, config, *, well: Well, row: pd.Series, max_pages: i
         "well": well.name,
         "title": title,
         **provenance,
-        "chunks": chunk_index,
+        "extended_existing_document": extending,
+        "start_page": start_page,
+        "pages_stored_before": already_ingested_to,
+        "chunks": chunks_added,
         "events_stored": stored_events,
         "mitigations_stored": stored_mitigations,
         "formation_intervals_found": len(formation_records),
@@ -258,6 +343,11 @@ def main() -> int:
                         help="maximum number of documents to ingest")
     parser.add_argument("--max-pages", type=int, default=None,
                         help="override documents.max_pages_per_document")
+    parser.add_argument("--start-page", type=int, default=0,
+                        help="zero-based first page to read. Past an already-ingested "
+                             "range this extends the stored document instead of "
+                             "skipping it, which is how the drilling-operations "
+                             "narrative deeper in a report gets ingested.")
     parser.add_argument("--list", action="store_true",
                         help="list available documents without ingesting")
     args = parser.parse_args()
@@ -290,13 +380,15 @@ def main() -> int:
         if args.limit:
             index = index.head(args.limit)
 
-        log.info("ingestion_start", documents=len(index), max_pages_each=max_pages)
+        log.info("ingestion_start", documents=len(index),
+                 max_pages_each=max_pages, start_page=args.start_page)
         results = []
         for _, row in index.iterrows():
             well = wells[str(row["wlbName"]).strip()]
             try:
                 results.append(ingest_document(session, config, well=well,
-                                               row=row, max_pages=max_pages))
+                                               row=row, max_pages=max_pages,
+                                               start_page=args.start_page))
                 session.commit()
             except Exception as exc:
                 session.rollback()

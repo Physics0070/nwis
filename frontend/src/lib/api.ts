@@ -268,6 +268,38 @@ export interface ReplayState {
   source: string;
 }
 
+export interface PassageMatch {
+  chunk_id: number;
+  document_id: number;
+  document_title: string;
+  well_id: number | null;
+  well_name: string | null;
+  page_number: number | null;
+  /** Cosine similarity in [-1, 1]; higher is closer. */
+  similarity: number;
+  text: string;
+}
+
+/**
+ * Search results together with what was actually searched. `provenance` reports how much
+ * of the corpus is indexed, so a partial index is visible rather than being presented as
+ * a complete search.
+ */
+export interface DocumentSearchResponse {
+  results: PassageMatch[];
+  provenance: {
+    query: string;
+    passages_searched: number;
+    passages_indexed: number;
+    passages_total: number;
+    model: string;
+    similarity_metric: string;
+    min_similarity: number;
+    restricted_to_well_id: number | null;
+    note?: string;
+  };
+}
+
 export interface SystemStatus {
   application: string;
   environment: string;
@@ -360,6 +392,13 @@ export const api = {
 
   wellActions: (id: number) =>
     request<EngineerAction[]>(`/api/wells/${id}/engineer-actions`),
+
+  searchDocuments: (query: string, options?: { wellId?: number; limit?: number }) => {
+    const params = new URLSearchParams({ q: query });
+    if (options?.wellId != null) params.set("well_id", String(options.wellId));
+    if (options?.limit != null) params.set("limit", String(options.limit));
+    return request<DocumentSearchResponse>(`/api/documents/search?${params}`);
+  },
 
   models: () => request<ModelVersion[]>("/api/models"),
   model: (name: string) => request<ModelVersion>(`/api/models/${name}`),
