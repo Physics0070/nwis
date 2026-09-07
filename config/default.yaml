@@ -184,6 +184,27 @@ lithology_model:
 
   min_class_support: 50         # classes below this are reported separately, not dropped silently
 
+  # Grouped cross-validation for model selection.
+  #
+  # A single 15-well validation set cannot separate the candidates: the two unseen-well
+  # estimates (validation and the external leaderboard holdout) disagree about which
+  # model is better, which is a symptom of well-to-well variance rather than a real
+  # difference. Cross-validating over the selection wells gives every well a turn as
+  # unseen data and reports the spread, so the disagreement can be settled on evidence.
+  #
+  # Folds are grouped BY WELL: no well ever appears in both sides of a fold, which is
+  # the same discipline as the top-level split. The test wells and the FORCE leaderboard
+  # holdout take no part in this and remain untouched by selection.
+  cross_validation:
+    splits: 5
+    # Which of the top-level splits may be used. Both of these are already
+    # selection-legal; "test" must never appear here.
+    use_splits: ["train", "validation"]
+    # Wells held out of each fold's training data purely to early-stop boosting. Taken
+    # from the fold's own training wells, never from the fold's evaluation wells.
+    early_stopping_well_fraction: 0.15
+    random_state: 42
+
 volve_pipeline:
   # Log objects to ingest, resolved against what the WITSML files actually contain.
   # CementData / GasTime / Pits are separate operations and are excluded from the
@@ -402,3 +423,16 @@ documents:
   chunk:
     size_chars: 1200
     overlap_chars: 150
+
+  # Semantic search over report passages. The model is a sentence-transformer, so these
+  # vectors live in a different space from the 32-dimensional petrophysical segment
+  # embeddings used by the analogue engine and are never compared against them.
+  embedding:
+    enabled: true
+    model: "sentence-transformers/all-MiniLM-L6-v2"
+    dimensions: 384             # mirrors models.entities.TEXT_EMBEDDING_DIMENSIONS
+    batch_size: 32
+    # Cosine similarity below this is not returned: a passage that matches nothing
+    # should produce an empty result, not the least-bad passage in the corpus.
+    min_similarity: 0.25
+    max_results: 10

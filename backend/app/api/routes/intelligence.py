@@ -20,13 +20,16 @@ from backend.app.models import (
     WellEmbedding,
 )
 from backend.app.schemas.models import (
+    DocumentSearchOut,
     EngineerActionIn,
     EngineerActionOut,
     ModelVersionOut,
+    PassageMatchOut,
     RiskAlertOut,
     RiskAssessmentOut,
     SystemStatus,
 )
+from backend.app.services import document_search
 from backend.app.services import risk as risk_service
 from nwis_common import get_config
 
@@ -249,6 +252,35 @@ def get_model(name: str, session: Session = Depends(get_session)):
             detail=f"Model {name!r} has not been trained. No metrics exist for it.",
         )
     return ModelVersionOut.model_validate(row)
+
+
+@router.get("/documents/search", response_model=DocumentSearchOut)
+def search_documents(
+    q: str = Query(min_length=2, description="natural-language query"),
+    session: Session = Depends(get_session),
+    well_id: int | None = Query(default=None, description="restrict to one well's reports"),
+    limit: int | None = Query(default=None, ge=1, le=50),
+    min_similarity: float | None = Query(default=None, ge=-1.0, le=1.0),
+):
+    """Find report passages that mean the same thing as the query.
+
+    Returns scanned passages with their document and page number, never a generated
+    answer: the engineer reads the source text and the citation says where to find it.
+
+    A corpus with no embeddings yet is reported as unavailable with the command that
+    builds the index, rather than returning an empty list that looks like "no matches".
+    """
+    try:
+        matches, provenance = document_search.search(
+            session, q, limit=limit, well_id=well_id, min_similarity=min_similarity
+        )
+    except document_search.SearchUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return DocumentSearchOut(
+        results=[PassageMatchOut(**vars(m)) for m in matches],
+        provenance=provenance,
+    )
 
 
 @router.get("/status", response_model=SystemStatus)

@@ -32,6 +32,11 @@ from backend.app.models.types import GeographyPoint, Vector
 
 EMBEDDING_DIMENSIONS = 32  # mirrors analogue.embedding_dim; asserted at startup
 
+# Report passages are embedded by a sentence-transformer, not by the petrophysical
+# encoder, so they carry that model's dimensionality. The two vector spaces are
+# unrelated and must never be compared against each other.
+TEXT_EMBEDDING_DIMENSIONS = 384  # mirrors documents.embedding.dimensions
+
 
 # ============================================================== wells and geometry
 
@@ -346,7 +351,7 @@ class DocumentChunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     page_number: Mapped[int | None] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[list | None] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
+    embedding: Mapped[list | None] = mapped_column(Vector(TEXT_EMBEDDING_DIMENSIONS))
 
     __table_args__ = (
         UniqueConstraint("document_id", "chunk_index", name="uq_document_chunk"),
@@ -518,4 +523,5 @@ __all__ = [
     "EngineerAction",
     "ModelVersion",
     "EMBEDDING_DIMENSIONS",
+    "TEXT_EMBEDDING_DIMENSIONS",
 ]

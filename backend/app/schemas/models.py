@@ -274,3 +274,27 @@ class SystemStatus(BaseModel):
     counts: dict[str, int]
     models: list[dict[str, Any]]
     warnings: list[str] = Field(default_factory=list)
+
+
+class PassageMatchOut(BaseModel):
+    """One report passage retrieved by semantic search, with its citation."""
+
+    chunk_id: int
+    document_id: int
+    document_title: str
+    well_id: int | None = None
+    well_name: str | None = None
+    page_number: int | None = None
+    similarity: float = Field(description="Cosine similarity in [-1, 1]; higher is closer.")
+    text: str
+
+
+class DocumentSearchOut(BaseModel):
+    """Search results plus what was actually searched to produce them.
+
+    ``provenance`` reports how much of the corpus is indexed, so a partial index is
+    visible to the caller rather than being presented as a complete search.
+    """
+
+    results: list[PassageMatchOut]
+    provenance: dict[str, Any]
