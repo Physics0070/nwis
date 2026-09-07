@@ -75,9 +75,9 @@ Last updated: 2026-09-07
 
 ## Phase 9 — Historical event intelligence
 
-- [ ] Event extraction from WITSML messages
-- [ ] Event → depth interval → formation linkage
-- [ ] Evidence traceability to source records
+- [x] Event extraction from WITSML messages (184 events, depths recovered by time-join)
+- [x] Event -> depth interval -> formation linkage (depth-range lookup on intervals)
+- [x] Evidence traceability (source_dataset, source_reference, depth_source, confidence)
 
 ## Phase 10 — Risk engine
 
