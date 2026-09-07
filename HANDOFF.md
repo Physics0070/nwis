@@ -1,7 +1,7 @@
 # NWIS — Handoff
 
 Repository root: `D:\SOHAM ALL\hackathons\SIH`
-Last session: 2026-09-07 · 22 commits on `master`, 9 of them this session
+Last session: 2026-09-08 · 29 commits on `main` · pushed to github.com/Physics0070/nwis
 
 ---
 
@@ -47,10 +47,18 @@ carries the verdict beside it with `models_separable_on_this_evidence: false`.
 *labelled* incidents. The 48 mitigations are extracted actions with page citations, not
 supervised labels; see §6 item 1.
 
-**Open:** `docker compose up --build` has **still never been executed.** Docker Desktop
-needs WSL2, `wsl --status` reports it is not installed, and installing it raises a UAC
-prompt that a non-interactive session cannot approve. Everything runs on the documented
-local fallback (SQLite + SQL haversine + NumPy cosine), which the UI states in its header.
+**Docker: partially verified.** WSL2 and Docker Desktop 4.90 are now installed and the
+engine runs. `docker compose config` is valid, and the `frontend` (103 MB) and `database`
+(4.28 GB, Postgres + PostGIS + TimescaleDB + pgvector) images both build. The `backend`
+image was still building when it was stopped for time — nothing had failed. `docker compose
+up` has **not** been run end to end, so the PostGIS / TimescaleDB / pgvector query paths
+remain unproven and the app still runs on the documented local fallback (SQLite + SQL
+haversine + NumPy cosine), which the UI states in its header badge. See `docs/DOCKER.md`.
+
+**Docker storage lives on D:.** `%LOCALAPPDATA%\Docker\wsl\disk` is a junction to
+`D:\DockerData\disk`. The `DataFolder` setting in `settings-store.json` does **not** work
+on the WSL2 backend — Docker ignores it and refills C:. A build consumed ~10 GB and drove
+C: to 2.2 GB free, at which point Windows began failing to start processes.
 
 ---
 
@@ -70,7 +78,8 @@ local fallback (SQLite + SQL haversine + NumPy cosine), which the UI states in i
 | `frontend/src/pages/Reports.tsx` | report search |
 | `frontend/src/lib/api.ts` | **every** value the UI shows passes through here |
 | `scripts/bootstrap.py` | one-command rebuild of the whole knowledge base |
-| `CHECKLIST.md` | 1 blocked (Docker) |
+| `docs/DOCKER.md` | Docker runbook: what is verified, what is not |
+| `CHECKLIST.md` | 1 partially verified (Docker) |
 
 ---
 
@@ -156,10 +165,10 @@ Worked items 2, 3 and 4 of the previous handoff's next-steps list.
    reports (there are **388 in the Sodir index covering 75 of our wells**, and only 2 are
    read) to get to a usable count, or keep `hybrid_indicator` and say why. Do not split
    the difference by training on 48 rows.
-2. **Verify the Docker stack.** Install WSL2 + Docker Desktop (needs a human to approve
-   the UAC prompt), then `docker compose up --build`. Still the only checklist item open
-   and the only way to exercise PostGIS / TimescaleDB / pgvector. The 562 stored 384-d
-   vectors now make the pgvector path worth actually testing.
+2. **Finish the Docker stack.** Prerequisites are done. With Docker Desktop running,
+   `docker compose build` resumes from cache and only the backend image remains, then
+   `docker compose up`. Confirm `/api/status` reports `fallback_active: false` before
+   claiming the Postgres stack works.
 3. **Ingest more reports.** `--limit N` walks the Sodir index largest-first, and the
    deep-page path is now proven. This is the input to step 1. Budget ~14 s/page.
 4. **Review the extraction lexicons against the new volume.** `PROBLEM_TERMS`,

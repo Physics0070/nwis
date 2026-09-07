@@ -177,10 +177,36 @@ docker compose down -v       # stop and delete the data, forcing a full reseed n
 
 ---
 
-## Known limitation
+## What has actually been verified
 
-This stack has been authored and unit-tested for structure, but on this machine it has
-**never been executed** — Docker Desktop requires WSL2, whose installation raises a UAC
-prompt that a non-interactive session cannot approve. The defects found by inspection are
-fixed and covered by tests in `backend/tests/test_deployment.py`, but "it builds and runs"
-is a claim that needs one real `docker compose up` behind it before anyone should make it.
+Docker Desktop 4.90 was installed on this machine and the engine was brought up, so this
+is no longer entirely unexercised. What was proven, and what was not:
+
+| Step | Status |
+|---|---|
+| WSL2 installed, virtualization present | **verified** |
+| Docker engine running (29.7.2, overlayfs) | **verified** |
+| `docker compose config` parses, dependency conditions resolve | **verified** |
+| `sih-frontend` image builds (103 MB) | **verified** |
+| `sih-database` image builds — Postgres + PostGIS + TimescaleDB + pgvector (4.28 GB) | **verified** |
+| `sih-backend` / `loader` image builds | **not completed** — stopped mid-build for time |
+| `docker compose up` end to end | **not run** |
+| PostGIS / TimescaleDB / pgvector serving real queries | **not run** |
+
+The backend image is the slow one: it installs torch, spaCy, XGBoost and scikit-learn, and
+had written over 12 GB of layers when the build was stopped. Nothing about it had failed —
+it was simply not finished, and the deadline mattered more.
+
+So: the compose file is valid, two of three images are known to build, and the registry,
+engine and storage paths all work. **Whether the full stack comes up and serves is still an
+open claim.** Do not tell a jury it runs on Postgres until you have seen the header badge
+say `postgres stack` yourself.
+
+To finish it, with Docker Desktop running:
+
+```bash
+docker compose build      # resumes from cache; only the backend image remains
+docker compose up
+```
+
+Then check `/api/status` for `fallback_active: false`.
