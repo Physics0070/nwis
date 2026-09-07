@@ -165,6 +165,7 @@ Last updated: 2026-09-07
 | Institutional memory | **48 mitigations, up from 0.** 147 document events across 10 categories, each carrying the page and the sentence it came from |
 | Extraction precision | 37 mentions excluded and reported by reason: 12 the report explicitly denies ("No tight spot"), 25 routine leak-off tests. Both were being stored as incidents before |
 | Semantic search | 562 passages embedded (MiniLM-L6-v2, 384-d). Retrieval verified against the corpus; a query matching nothing returns nothing rather than the least-bad passage |
+| **Model selection settled** | Grouped CV, 5 folds over 83 wells: XGBoost 0.3840 +/- 0.0543, RandomForest 0.3667 +/- 0.0462, p = 0.224. **The models are not separable**: the fold spread is 3.1x the difference between them. The validation/holdout disagreement was variation between well draws, not a difference between models |
 
 ## Open items / risks
 

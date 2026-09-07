@@ -359,3 +359,85 @@ def test_exclusions_are_counted_and_reasoned_not_dropped_silently():
         (3, "c", "tight_hole", "denied_by_report"),
     ]
     assert count_exclusion_reasons(excluded) == {"denied_by_report": 2, "routine:leak off": 1}
+
+
+def test_a_difference_smaller_than_the_fold_spread_is_not_a_winner():
+    """The measured case: mean gap 0.017 against a fold spread of 0.054.
+
+    Reporting a winner there would dress up the variation between draws of wells as a
+    difference between models.
+    """
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from ml.lithology.cross_validate import _record_verdict
+
+    report = {
+        "splits": 5,
+        "wells": 83,
+        "ranking": ["xgboost", "random_forest"],
+        "per_model": {
+            "xgboost": {"macro_f1_mean": 0.3840, "macro_f1_std": 0.0543},
+            "random_forest": {"macro_f1_mean": 0.3667, "macro_f1_std": 0.0462},
+        },
+        "comparison": {
+            "mean_difference": 0.0173,
+            "folds_won": 4,
+            "folds_total": 5,
+            "paired_p_value": 0.2241,
+            "caveat": "anti-conservative",
+        },
+    }
+
+    with tempfile.TemporaryDirectory() as directory:
+        artifacts = Path(directory)
+        (artifacts / "selected.json").write_text(
+            json.dumps({"selected_model": "random_forest"}), encoding="utf-8"
+        )
+        _record_verdict(artifacts, report)
+        written = json.loads((artifacts / "selected.json").read_text(encoding="utf-8"))
+
+    verdict = written["cross_validation"]
+    assert verdict["difference_vs_fold_spread"]["models_separable_on_this_evidence"] is False
+    assert "cannot separate" in verdict["conclusion"]
+    # The pre-committed choice must survive untouched: a verdict annotates, never swaps.
+    assert written["selected_model"] == "random_forest"
+
+
+def test_a_difference_larger_than_the_spread_is_reported_as_a_real_result():
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from ml.lithology.cross_validate import _record_verdict
+
+    report = {
+        "splits": 5,
+        "wells": 83,
+        "ranking": ["xgboost", "random_forest"],
+        "per_model": {
+            "xgboost": {"macro_f1_mean": 0.50, "macro_f1_std": 0.01},
+            "random_forest": {"macro_f1_mean": 0.30, "macro_f1_std": 0.01},
+        },
+        "comparison": {
+            "mean_difference": 0.20,
+            "folds_won": 5,
+            "folds_total": 5,
+            "paired_p_value": 0.001,
+            "caveat": "anti-conservative",
+        },
+    }
+
+    with tempfile.TemporaryDirectory() as directory:
+        artifacts = Path(directory)
+        (artifacts / "selected.json").write_text(
+            json.dumps({"selected_model": "random_forest"}), encoding="utf-8"
+        )
+        _record_verdict(artifacts, report)
+        verdict = json.loads(
+            (artifacts / "selected.json").read_text(encoding="utf-8")
+        )["cross_validation"]
+
+    assert verdict["difference_vs_fold_spread"]["models_separable_on_this_evidence"] is True
+    assert "disagrees with the single-split selection" in verdict["conclusion"]

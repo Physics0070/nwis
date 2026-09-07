@@ -236,6 +236,9 @@ def main() -> int:
                         help="restrict to specific candidates (repeatable)")
     parser.add_argument("--splits", type=int, default=None,
                         help="override lithology_model.cross_validation.splits")
+    parser.add_argument("--verdict-only", action="store_true",
+                        help="recompute the verdict from an existing "
+                             "cross_validation.json without refitting anything")
     parser.add_argument("--max-wells", type=int, default=None,
                         help="use only the first N selection wells (fast smoke check; "
                              "results are written with smoke_run set and are not "
@@ -243,6 +246,22 @@ def main() -> int:
     args = parser.parse_args()
 
     config = get_config()
+
+    if args.verdict_only:
+        artifacts_dir = Path(config.get("paths.models")) / MODEL_NAME
+        report_path = artifacts_dir / "cross_validation.json"
+        if not report_path.exists():
+            log.error("no_cross_validation_report", path=str(report_path),
+                      hint="run python -m ml.lithology.cross_validate first")
+            return 1
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        if report.get("smoke_run"):
+            log.error("smoke_report", path=str(report_path),
+                      note="this report came from --max-wells and must not drive selection")
+            return 1
+        _record_verdict(artifacts_dir, report)
+        return 0
+
     processed = config.path("paths.data_processed") / "force"
     features_path = processed / "features.parquet"
     if not features_path.exists():
@@ -373,14 +392,49 @@ def _record_verdict(artifacts_dir: Path, report: dict) -> None:
         "std_macro_f1": {k: v["macro_f1_std"] for k, v in report["per_model"].items()},
         "report": "cross_validation.json",
     }
+    separable = True
     if comparison:
         verdict["folds_won"] = f"{comparison['folds_won']} of {comparison['folds_total']}"
         verdict["mean_difference"] = comparison["mean_difference"]
         verdict["paired_p_value"] = comparison.get("paired_p_value")
         verdict["caveat"] = comparison["caveat"]
 
+        # The question that decides what this run actually established: is the gap
+        # between the models larger than the scatter between folds? When it is not, the
+        # honest finding is that the data cannot tell them apart — reporting a "winner"
+        # would dress up noise as a result.
+        spreads = [
+            v["macro_f1_std"] for v in report["per_model"].values()
+            if v.get("macro_f1_std") is not None
+        ]
+        widest_spread = max(spreads) if spreads else None
+        gap = abs(comparison["mean_difference"])
+        if widest_spread:
+            separable = gap > widest_spread
+            verdict["difference_vs_fold_spread"] = {
+                "mean_difference": round(gap, 4),
+                "widest_fold_spread": round(widest_spread, 4),
+                "spread_is_this_many_times_the_difference": round(widest_spread / gap, 1)
+                if gap
+                else None,
+                "models_separable_on_this_evidence": separable,
+            }
+
     previous = selection.get("selected_model")
-    if previous == winner:
+
+    if not separable:
+        verdict["conclusion"] = (
+            f"Cross-validation cannot separate these models. {winner!r} has the higher "
+            f"mean macro F1, but the difference ({comparison['mean_difference']}) is "
+            f"smaller than the spread between folds, and the paired test over folds does "
+            f"not distinguish them "
+            f"(p = {comparison.get('paired_p_value')}). The original disagreement between "
+            "the validation wells and the external holdout is therefore explained: it was "
+            "never a contest between the models, it was the variation between draws of "
+            f"wells. The served model stays {previous!r}, and no claim that either model "
+            "is better is supported by this evidence."
+        )
+    elif previous == winner:
         verdict["conclusion"] = (
             f"Cross-validation agrees with the single-split selection: {winner!r} is "
             "still the choice, now on evidence from every selection well rather than "

@@ -75,6 +75,11 @@ export default function Reports() {
 
   const provenance = search.data?.provenance;
 
+  const runSearch = () => {
+    const next = draft.trim();
+    if (next.length >= 2) setQuery(next);
+  };
+
   return (
     <div className="space-y-4">
       <Panel
@@ -84,13 +89,22 @@ export default function Reports() {
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            setQuery(draft);
+            runSearch();
           }}
           className="flex flex-wrap gap-2"
         >
           <input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            // Enter inside the form should submit on its own. Handling the key here as
+            // well costs nothing and makes the primary affordance independent of
+            // implicit form submission, which does not fire in every environment.
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                runSearch();
+              }
+            }}
             placeholder="Describe what you are looking for, in plain language"
             aria-label="Search report passages"
             className="min-w-[260px] flex-1 rounded-pill border border-surface-border bg-surface-overlay px-4 py-2 text-sm text-ink-primary placeholder:text-ink-muted focus:border-accent focus:outline-none"

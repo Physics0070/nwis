@@ -101,11 +101,47 @@ over folds is reported **with its caveat attached**: CV folds share training dat
 test is anti-conservative, and with this few folds it describes the size of the gap
 relative to the spread rather than establishing a significant difference.
 
+### What it measured
+
+5 folds, 83 selection wells, 987,127 rows.
+
+| Model | Mean macro F1 | Std | Per fold |
+|---|---|---|---|
+| XGBoost | **0.3840** | 0.0543 | 0.4392 · 0.3394 · 0.3178 · 0.3913 · 0.4322 |
+| RandomForest | 0.3667 | 0.0462 | 0.4288 · 0.3549 · 0.3141 · 0.3382 · 0.3975 |
+
+XGBoost wins 4 folds of 5, by a mean of 0.0173. Paired t = 1.44, **p = 0.224**.
+
+**The conclusion is that the two models are not separable on this data.** The spread
+between folds (0.0543) is 3.1 times the difference between the models (0.0173); scores
+range from 0.314 to 0.439 depending only on *which wells* land in the evaluation fold.
+
+That settles the original question, though not the way "run a better experiment" usually
+implies. The validation/holdout disagreement was never a contest between the two models —
+it was the variation between draws of wells, and cross-validation measured how large that
+variation is. XGBoost's win on the external holdout is consistent with its win here, but
+neither result distinguishes the models at this sample size.
+
+So no claim that either model is better is supported, and none is made.
+
+### How the verdict is recorded
+
 The verdict is *attached* to `selected.json`, not substituted into it. `selected_model`
-still records what the pre-committed rule chose; the cross-validated result sits beside it
-saying whether that choice survives a stronger test. Changing the served model remains a
-deliberate act of re-opening a pre-committed selection rule, not something a script does
-quietly.
+still records what the pre-committed rule chose — RandomForest, which is what is served —
+and the cross-validated result sits beside it, including
+`models_separable_on_this_evidence: false`. Changing the served model remains a deliberate
+act of re-opening a pre-committed selection rule, not something a script does quietly, and
+on this evidence there is no reason to.
+
+`--verdict-only` recomputes the verdict from an existing report without refitting
+anything, so the reasoning applied to the numbers can be revised without a 50-minute
+training run. It refuses to read a `--max-wells` smoke report.
+
+### What would actually settle it
+
+More folds, or repeated CV with different fold seeds, would shrink the standard error of
+the difference. The honest reading of the current numbers is that separating these two
+models needs more wells than FORCE 2020 provides, not a better metric.
 
 ### Leakage prevented deliberately
 
