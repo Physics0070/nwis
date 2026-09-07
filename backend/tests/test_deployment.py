@@ -138,3 +138,56 @@ def test_expected_models_are_registered(name):
     if name not in registered:
         pytest.skip(f"{name} not trained in this checkout")
     assert name in registered
+
+
+def test_compose_seeds_the_database_before_the_api_serves_it():
+    """`docker compose up` must not yield an empty database.
+
+    The stack previously brought up Postgres, the API and the SPA with nothing loading
+    any data, so a demo would have shown zero wells.
+    """
+    compose = yaml.safe_load(
+        (repo_root() / "docker-compose.yml").read_text(encoding="utf-8")
+    )
+    services = compose["services"]
+    assert "loader" in services, "no service loads the knowledge base"
+
+    loader = services["loader"]
+    assert loader.get("restart") == "no", "the seed must run once, not restart forever"
+
+    backend_deps = services["backend"]["depends_on"]
+    assert backend_deps["loader"]["condition"] == "service_completed_successfully", (
+        "the API must wait for seeding, or it serves an empty database"
+    )
+
+
+def test_loader_resets_the_schema_before_the_migration_not_after():
+    """Ordering is load-then-migrate, and it is not cosmetic.
+
+    `load_database --reset` calls drop_all. Running it after the migration would drop the
+    hypertable and the GIST/ivfflat indexes the migration had just created, silently
+    losing every Postgres-specific feature the stack exists to provide.
+    """
+    compose = yaml.safe_load(
+        (repo_root() / "docker-compose.yml").read_text(encoding="utf-8")
+    )
+    script = compose["services"]["loader"]["command"][-1]
+
+    reset_at = script.index("load_database --reset")
+    migrate_at = script.index("alembic")
+    assert reset_at < migrate_at, "drop_all would destroy the migration's Postgres objects"
+
+
+def test_loader_can_reach_the_coordinate_source():
+    """Seeding reads the NPD coordinate CSVs from data/raw.
+
+    The backend mounts only data/processed; mounting the same for the loader would leave
+    every well without a surveyed position.
+    """
+    compose = yaml.safe_load(
+        (repo_root() / "docker-compose.yml").read_text(encoding="utf-8")
+    )
+    mounts = compose["services"]["loader"]["volumes"]
+    assert any(m.startswith("./data:") for m in mounts), (
+        "loader cannot read data/raw, so NPD positions would be missing"
+    )

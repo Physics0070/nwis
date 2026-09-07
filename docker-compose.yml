@@ -37,6 +37,8 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      loader:
+        condition: service_completed_successfully
     environment:
       NWIS_ENV: ${NWIS_ENV:-production}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-nwis}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-nwis}
@@ -50,6 +52,48 @@ services:
       - ./artifacts:/app/artifacts:ro
       - ./data/processed:/app/data/processed:ro
     restart: unless-stopped
+
+  # One-shot: create the schema, load the knowledge base, then exit. The backend waits
+  # for this to complete successfully, so `docker compose up` yields a populated stack
+  # rather than an empty database.
+  #
+  # Order is deliberate. `load_database --reset` calls drop_all, so it must run BEFORE
+  # the migration, not after — otherwise it drops the hypertable and the GIST/ivfflat
+  # indexes the migration just created.
+  #
+  # The migration step is best-effort: the hypertable and vector indexes are performance
+  # features, not correctness ones. If TimescaleDB rejects the conversion the stack still
+  # serves correct results, and /api/status reports which backends are actually active
+  # instead of claiming all of them.
+  loader:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: nwis-loader
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      NWIS_ENV: ${NWIS_ENV:-production}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-nwis}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-nwis}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      NWIS__DATABASE__ALLOW_FALLBACK: "false"
+    volumes:
+      # Read-only except artifacts, which the prediction step writes a report into.
+      - ./artifacts:/app/artifacts
+      - ./data:/app/data:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        python -m data_pipeline.load_database --reset
+        alembic -c backend/alembic.ini upgrade head \
+          || echo "migration extras unavailable; continuing without hypertable/vector indexes"
+        python -m data_pipeline.load_embeddings
+        python -m data_pipeline.load_anomaly_scores
+        python -m ml.lithology.predict
+    restart: "no"
 
   frontend:
     build:
