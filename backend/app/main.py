@@ -7,6 +7,8 @@ value.
 """
 from __future__ import annotations
 
+import asyncio
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -16,15 +18,39 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from backend.app.api.routes import intelligence, replay, wells
 from backend.app.core.database import get_capabilities, get_engine
+from backend.app.core.startup import run_startup_checks
 from backend.app.models import Base
 from nwis_common import configure_logging, get_config, get_logger
 
 log = get_logger("nwis.api")
 
 
+def _silence_windows_disconnect_noise() -> None:
+    """Stop abrupt websocket disconnects filling the log with tracebacks.
+
+    On Windows the proactor event loop raises ConnectionResetError from
+    _call_connection_lost when a client closes a socket without a clean handshake, which
+    a browser tab does every time it is refreshed. It is expected, not an error, and the
+    traceback obscures real problems.
+    """
+    if not sys.platform.startswith("win"):
+        return
+
+    def handler(loop, context):
+        if isinstance(context.get("exception"), ConnectionResetError):
+            return
+        loop.default_exception_handler(context)
+
+    try:
+        asyncio.get_running_loop().set_exception_handler(handler)
+    except RuntimeError:  # pragma: no cover - called outside a running loop
+        pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    _silence_windows_disconnect_noise()
     config = get_config()
     engine = get_engine()
     Base.metadata.create_all(engine)
@@ -40,6 +66,10 @@ async def lifespan(app: FastAPI):
             note="PostGIS/TimescaleDB/pgvector are not in use; equivalent fallback "
                  "implementations are serving spatial, time-series and vector queries",
         )
+
+    # Fails fast in production on a fallback database, a placeholder password or a
+    # wildcard CORS origin. Warnings only in development.
+    run_startup_checks()
     yield
     log.info("api_shutdown")
 

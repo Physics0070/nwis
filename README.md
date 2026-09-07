@@ -26,7 +26,9 @@ rather than showing a zero.
 | Segment embeddings | **3,620** across 98 wells, 32 interpretable dimensions |
 | Lithology model | trained on 1,170,511 rows; evaluated on **10 wells it has never seen** |
 | Anomaly model | trained on 8,130 operationally-active rows, 121 features |
-| Tests | **31 passing**, 2 skipped |
+| Lithology predictions | **18,842** stored, 0.80 agreement with labels |
+| Documents ingested | 60 scanned pages OCR'd, 33 formation intervals recovered |
+| Tests | **46 backend + 14 frontend passing** |
 
 Model metrics are in [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md). They are what the models
 scored, including where they scored badly.
@@ -93,27 +95,25 @@ Frontend on <http://localhost:5173>, API on <http://localhost:8000>, docs at `/d
 
 ```bash
 pip install -r backend/requirements.txt
+cd frontend && npm install && cd ..
 
-python scripts/download_datasets.py         # ~325 MB, about a minute
-python -m data_pipeline.force.profile
-python -m data_pipeline.force.prepare
-python -m data_pipeline.volve.prepare
-python -m ml.lithology.train
-python -m ml.anomaly.train
-python -m ml.similarity.build_embeddings
-python -m data_pipeline.load_database --reset
-python -m data_pipeline.load_embeddings
+python scripts/bootstrap.py                  # builds everything, skips what exists
 
 uvicorn backend.app.main:app --reload        # terminal 1
-cd frontend && npm install && npm run dev    # terminal 2
+cd frontend && npm run dev                   # terminal 2
 ```
+
+`bootstrap.py` runs every stage in dependency order: download, profile, prepare, train,
+load, predict. Use `--dry-run` to preview, `--skip-documents` to skip the slow OCR stage,
+and `--force` to rebuild from scratch.
 
 Without the Postgres stack the backend uses a local storage backend and **says so** — in
 the header badge, in `/api/status`, and in the startup log. Nearby-well search still runs
 as a real SQL haversine query and vector search as NumPy cosine; results are equivalent.
 See [`docs/ASSUMPTIONS.md`](docs/ASSUMPTIONS.md) A2.
 
-Full instructions: [`docs/SETUP.md`](docs/SETUP.md). Demo script: [`docs/DEMO.md`](docs/DEMO.md).
+Full instructions: [`docs/SETUP.md`](docs/SETUP.md) · Deployment:
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) · Demo script: [`docs/DEMO.md`](docs/DEMO.md).
 
 ---
 
@@ -164,7 +164,7 @@ ml/                lithology · anomaly · similarity + registry and metrics
 backend/           FastAPI app, SQLAlchemy models, repositories, services
 frontend/          React + TypeScript + Tailwind + Leaflet + Recharts
 docker/            Postgres (PostGIS + TimescaleDB + pgvector), backend, frontend images
-docs/              architecture, data pipeline, ML, API, setup, demo, model card, assumptions
+docs/              architecture, data pipeline, ML, API, setup, demo, deployment, model card, assumptions
 artifacts/         profiling reports and the model registry
 CHECKLIST.md       build progress
 ```
@@ -178,7 +178,8 @@ environment and by `NWIS__SECTION__KEY` environment variables.
 ## Tests
 
 ```bash
-python -m pytest backend/tests -q
+python -m pytest backend/tests -q      # 46 tests
+cd frontend && npm run test            # 14 tests
 ```
 
 Covers the honesty contracts (no invented probability, no invented position, no silently

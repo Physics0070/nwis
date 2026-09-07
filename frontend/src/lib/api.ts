@@ -6,6 +6,9 @@
  * data — if the backend cannot supply something, the UI shows an explicit state.
  */
 
+// In production the SPA is served from the same origin as the API through the nginx
+// proxy, so both bases are empty and every request is relative. In development they
+// point at the local backend on its own port.
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const WS_BASE = import.meta.env.VITE_WS_BASE_URL ?? "ws://localhost:8000";
 
@@ -246,6 +249,13 @@ export interface ModelVersion {
   limitations: string[];
 }
 
+export interface LithologyPrediction {
+  depth_md_m: number;
+  lithology_code: number;
+  lithology_name: string;
+  probability: number | null;
+}
+
 export interface ReplayState {
   well_id: number | null;
   well_name: string | null;
@@ -310,6 +320,9 @@ export const api = {
   trajectory: (id: number) =>
     request<TrajectoryStation[]>(`/api/wells/${id}/trajectory`),
 
+  lithology: (id: number, limit = 4000) =>
+    request<LithologyPrediction[]>(`/api/wells/${id}/lithology?limit=${limit}`),
+
   events: (id: number, limit = 200) =>
     request<DrillingEvent[]>(`/api/wells/${id}/events?limit=${limit}`),
 
@@ -370,5 +383,10 @@ export const api = {
 };
 
 export function telemetrySocketUrl(wellId: number): string {
-  return `${WS_BASE}/ws/telemetry/${wellId}`;
+  const path = `/ws/telemetry/${wellId}`;
+  if (WS_BASE) return `${WS_BASE}${path}`;
+  // Same-origin deployment: a WebSocket needs an absolute URL, so derive the scheme and
+  // host from the page. This also selects wss:// automatically when served over HTTPS.
+  const scheme = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${scheme}//${window.location.host}${path}`;
 }

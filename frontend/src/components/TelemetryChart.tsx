@@ -119,7 +119,7 @@ export default function TelemetryChart({
         ))}
         {missing.map((channel) => (
           <span key={channel.key} className="text-ink-muted">
-            {channel.label}: not reported by this well
+            {channel.label}: no readings in this window
           </span>
         ))}
       </div>

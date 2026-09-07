@@ -126,7 +126,7 @@ Last updated: 2026-09-07
 
 ## Phase 18 — Docs & Docker demo
 
-- [x] README, ARCHITECTURE, DATA_PIPELINE, ML, API, SETUP, DEMO, MODEL_CARD, ASSUMPTIONS
+- [x] README, ARCHITECTURE, DATA_PIPELINE, ML, API, SETUP, DEMO, DEPLOYMENT, MODEL_CARD, ASSUMPTIONS
 - [!] `docker compose up --build` NOT verified - Docker/WSL2 absent on this machine (ASSUMPTIONS A2)
 
 ---
@@ -151,6 +151,8 @@ Last updated: 2026-09-07
 | OCR honesty | Only 1 problem event and 0 mitigations found in these pages: they are sample descriptions, not operations narrative. Reported, not padded |
 | Anomaly scores persisted | 8,130 scores in DB (163 flagged, 2.0%); risk engine resolves them without being passed a value |
 | UI verified in a browser | Playwright: renders with zero console errors; map, telemetry, analogues, risk and evidence all populated from the API |
+| Lithology inference | 18,842 predictions stored; /api/wells/{id}/lithology serves them; UI shows lithology at depth |
+| Deployment hardening | Production config, fail-fast startup checks, nginx same-origin proxy (no CORS), non-root image, security headers, one-command bootstrap |
 | Known limitation | Chalk -> Limestone 99.8%: carbonate family is not separable on the available curves. Documented, not hidden |
 
 ## Open items / risks

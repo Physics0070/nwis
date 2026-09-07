@@ -1,0 +1,41 @@
+# Production overlay. Merged on top of config/default.yaml when NWIS_ENV=production.
+#
+# Only values that must differ in production appear here; everything else is inherited,
+# so tuning stays in one place.
+
+app:
+  environment: "production"
+
+logging:
+  level: "INFO"
+  format: "json"        # machine-readable for log shipping
+  sql_echo: false
+
+database:
+  # A production deployment must use the real PostgreSQL stack. Silently degrading to the
+  # local fallback would mean PostGIS, TimescaleDB and pgvector are quietly unused while
+  # the system appears healthy, so startup fails instead.
+  allow_fallback: false
+  pool_size: 10
+  max_overflow: 20
+  connect_timeout_seconds: 10
+  statement_timeout_seconds: 60
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  # The SPA is served from the same origin through the nginx proxy, so no cross-origin
+  # request is made and no origin needs to be allowed by default. Set
+  # NWIS__API__CORS_ORIGINS only if a separate frontend host is genuinely required.
+  cors_origins: []
+  default_page_size: 50
+  max_page_size: 500
+
+replay:
+  # Replay is a demonstration facility. It stays available in production but does not
+  # start on its own.
+  autostart: false
+
+documents:
+  # Batch ingestion on a server can afford more pages per document than a laptop run.
+  max_pages_per_document: 120

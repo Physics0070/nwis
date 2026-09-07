@@ -38,6 +38,10 @@ const CHANNELS: ChannelSpec[] = [
 // How far the bit must move before geological context is re-queried.
 const DEPTH_CONTEXT_STEP_M = 25;
 
+// Predictions are stored every 5 m; beyond this the nearest one no longer describes
+// the bit's position and nothing is shown rather than something misleading.
+const LITHOLOGY_MATCH_TOLERANCE_M = 10;
+
 export default function ActiveWell() {
   const { wellId } = useParams();
   const id = Number(wellId);
@@ -53,11 +57,26 @@ export default function ActiveWell() {
   // The bit has to move a meaningful distance before the geological context can change.
   const currentDepth = latest?.bit_depth_m ?? replayState?.current_depth_m ?? null;
   const [contextDepth, setContextDepth] = useState<number | null>(null);
+  const [manualDepth, setManualDepth] = useState<string>("");
+
   useEffect(() => {
     if (currentDepth === null) return;
     const quantised = Math.round(currentDepth / DEPTH_CONTEXT_STEP_M) * DEPTH_CONTEXT_STEP_M;
     setContextDepth((previous) => (previous === quantised ? previous : quantised));
   }, [currentDepth]);
+
+  // A well without telemetry has no bit to follow, so geological context would never
+  // resolve and the panels would stay empty. Historical wells open at mid-depth, which
+  // is inside the logged interval, and the engineer can query any depth from there.
+  useEffect(() => {
+    if (currentDepth !== null || contextDepth !== null) return;
+    const totalDepth = well.data?.total_depth_md_m;
+    if (totalDepth) {
+      const start = Math.round(totalDepth / 2 / DEPTH_CONTEXT_STEP_M) * DEPTH_CONTEXT_STEP_M;
+      setContextDepth(start);
+      setManualDepth(String(start));
+    }
+  }, [well.data, currentDepth, contextDepth]);
 
   const nearby = useQuery({
     queryKey: ["nearby", id],
@@ -85,10 +104,33 @@ export default function ActiveWell() {
     enabled: Number.isFinite(id),
   });
 
+  // Lithology predictions exist only for wells with wireline logs. A 404 here is a real
+  // answer ("this well has none"), not a failure, so it is not retried.
+  const lithology = useQuery({
+    queryKey: ["lithology", id],
+    queryFn: () => api.lithology(id),
+    enabled: Number.isFinite(id),
+    retry: false,
+  });
+
   const analogueNames = useMemo(
     () => new Set((analogues.data?.matches ?? []).map((m) => m.well.name)),
     [analogues.data],
   );
+
+  const currentLithology = useMemo(() => {
+    if (!lithology.data?.length || contextDepth === null) return null;
+    // Nearest stored prediction to the bit, provided it is within one decimation step.
+    let best = lithology.data[0];
+    for (const row of lithology.data) {
+      if (Math.abs(row.depth_md_m - contextDepth) < Math.abs(best.depth_md_m - contextDepth)) {
+        best = row;
+      }
+    }
+    return Math.abs(best.depth_md_m - contextDepth) <= LITHOLOGY_MATCH_TOLERANCE_M
+      ? best
+      : null;
+  }, [lithology.data, contextDepth]);
 
   const currentFormation = useMemo(() => {
     if (!formations.data || contextDepth === null) return null;
@@ -120,15 +162,37 @@ export default function ActiveWell() {
         <h1 className="text-lg font-semibold text-ink-primary">{activeWell.name}</h1>
         {activeWell.field_name && <Tag>{activeWell.field_name}</Tag>}
         {activeWell.source_dataset && <Tag>{activeWell.source_dataset}</Tag>}
-        {replayState && (
-          <span className="ml-auto text-xs text-ink-muted">
-            Telemetry source: <span className="text-ink-secondary">{replayState.source}</span>
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {/* Depth is driven by the replayed bit when a stream is live; otherwise the
+              engineer chooses it. Analogues, risk, formation and lithology all follow. */}
+          <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+            Context depth
+            <input
+              type="number"
+              value={currentDepth !== null ? Math.round(currentDepth) : manualDepth}
+              onChange={(event) => setManualDepth(event.target.value)}
+              onBlur={() => {
+                const parsed = Number(manualDepth);
+                if (Number.isFinite(parsed) && parsed >= 0) setContextDepth(parsed);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+              }}
+              disabled={currentDepth !== null}
+              className="w-24 rounded-card border border-surface-border bg-surface-overlay px-2 py-1 font-mono text-ink-primary disabled:opacity-60"
+            />
+            m
+          </label>
+          {replayState && (
+            <span className="text-xs text-ink-muted">
+              Source: <span className="text-ink-secondary">{replayState.source}</span>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* KPIs, all backend-derived */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Metric
           label="Bit depth"
           value={currentDepth}
@@ -142,6 +206,20 @@ export default function ActiveWell() {
             formations.data && formations.data.length === 0
               ? "No stratigraphy recorded for this well"
               : "Not resolved at this depth"
+          }
+        />
+        <Metric
+          label="Predicted lithology"
+          value={currentLithology?.lithology_name ?? null}
+          hint={
+            currentLithology?.probability != null
+              ? `model confidence ${formatNumber(currentLithology.probability, 2)}`
+              : undefined
+          }
+          unavailableReason={
+            lithology.isError
+              ? "No lithology predictions for this well"
+              : "Not predicted at this depth"
           }
         />
         <Metric
