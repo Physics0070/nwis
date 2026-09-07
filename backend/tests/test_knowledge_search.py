@@ -108,11 +108,18 @@ class _FakeSession:
         return False
 
 
-def test_search_requires_a_query():
+def test_a_blank_query_is_an_input_error_not_an_outage():
+    """These must be different exceptions.
+
+    "You sent whitespace" is the caller's problem (422); "the index is not built" is the
+    operator's (503). Sharing one exception made a healthy service report itself as down.
+    """
     from backend.app.services import document_search
 
-    with pytest.raises(document_search.SearchUnavailable):
+    with pytest.raises(ValueError):
         document_search.search(_FakeSession(), "   ")
+    # Specifically NOT the outage exception.
+    assert not issubclass(document_search.SearchUnavailable, ValueError)
 
 
 def test_search_reports_an_unbuilt_index_rather_than_no_matches():

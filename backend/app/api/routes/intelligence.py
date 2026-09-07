@@ -274,6 +274,9 @@ def search_documents(
         matches, provenance = document_search.search(
             session, q, limit=limit, well_id=well_id, min_similarity=min_similarity
         )
+    except ValueError as exc:
+        # Bad input from the caller. 503 here would report a healthy service as down.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except document_search.SearchUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

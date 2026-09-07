@@ -76,6 +76,15 @@ export function useTelemetryStream(wellId: number | null, bufferSize = 300) {
     socket.onclose = () => setConnection("closed");
 
     return () => {
+      // Detach before closing. A socket closed while still CONNECTING — which is what
+      // StrictMode's double mount does, and what switching wells does — still fires
+      // close (and sometimes error) afterwards. With its handlers attached it would
+      // report "closed" or "connection failed" over the socket that replaced it, so the
+      // UI would show a dead connection beside live streaming data.
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
       socket.close();
       socketRef.current = null;
     };

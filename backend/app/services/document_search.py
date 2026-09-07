@@ -108,9 +108,13 @@ def search(
             "report passages cannot be searched."
         )
 
+    # A blank query is the caller's mistake, not an outage. These are different
+    # conditions and must not share an exception: "the index is not built" is a 503 the
+    # operator has to act on, while "you sent whitespace" is a 422 the caller fixes.
+    # `q="  "` clears FastAPI's min_length check and only collapses to empty here.
     query = (query or "").strip()
     if not query:
-        raise SearchUnavailable("A search query is required.")
+        raise ValueError("A search query is required.")
 
     limit = limit or int(config.get("documents.embedding.max_results"))
     threshold = (

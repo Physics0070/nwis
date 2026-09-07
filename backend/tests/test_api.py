@@ -157,3 +157,27 @@ def test_openapi_schema_is_generated(client):
     schema = client.get("/openapi.json").json()
     assert "/api/wells" in schema["paths"]
     assert "/api/wells/{well_id}/analogues" in schema["paths"]
+
+
+def test_blank_search_query_is_a_client_error_not_a_service_outage(client, loaded):
+    """A whitespace query is bad input, not a broken search index.
+
+    `q="  "` clears FastAPI's min_length=2 check and only collapses to empty after
+    stripping. Reporting that as 503 tells the caller the service is down, which is both
+    wrong and indistinguishable from the genuine "index not built yet" case.
+    """
+    response = client.get("/api/documents/search", params={"q": "  "})
+    assert response.status_code == 422, response.text
+    assert response.status_code != 503
+
+
+def test_search_still_reports_a_real_outage_as_503(client, loaded, monkeypatch):
+    """The 4xx fix must not swallow the genuine unavailable case."""
+    from backend.app.services import document_search
+
+    def unavailable(*args, **kwargs):
+        raise document_search.SearchUnavailable("No passage embeddings yet.")
+
+    monkeypatch.setattr(document_search, "search", unavailable)
+    response = client.get("/api/documents/search", params={"q": "stuck pipe"})
+    assert response.status_code == 503, response.text
