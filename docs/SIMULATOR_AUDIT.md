@@ -261,6 +261,14 @@ still displays correctly, but the flow does not match the script.
 
 **3 — Docker loader blocked** on the missing parquet engine (above). One line.
 
+**4 — "0 m away" label was misleading (FIXED).** `distance_from_bit_m` is
+`event.depth_start_m - current_bit_depth`, a **vertical depth offset**, not a distance
+between wells. The simulator rendered it as "0 m away", which read as though an analogue
+well 8 km off were zero metres away. The number was correct — the bit and those F-9 events
+are both at 0 m depth — but the wording was not. Now reads "same depth" / "N m deeper" /
+"N m shallower". `ActiveWell` and `AlertExplanation` render the same field as `(+35 m)`
+beside a depth and were never ambiguous.
+
 ---
 
 ## Non-critical issues

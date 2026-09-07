@@ -5,7 +5,7 @@
  * loading; never re-querying leaves them describing the wrong depth.
  */
 import { describe, expect, it } from "vitest";
-import { nextContextDepth } from "./Simulator";
+import { depthRelationToBit, nextContextDepth } from "./Simulator";
 
 describe("nextContextDepth", () => {
   it("snaps to the grid on the first sample", () => {
@@ -25,5 +25,18 @@ describe("nextContextDepth", () => {
 
   it("follows the bit back up a hole as well as down", () => {
     expect(nextContextDepth(1225, 1200)).toBe(1200);
+  });
+});
+
+describe("depthRelationToBit", () => {
+  it("says same depth rather than '0 m away'", () => {
+    // The bit and the event are both at 0 m. "0 m away" read as a distance between
+    // wells, which is false for an analogue 8 km off.
+    expect(depthRelationToBit(0)).toBe("same depth");
+  });
+
+  it("states direction, because above and below the bit are different situations", () => {
+    expect(depthRelationToBit(120)).toBe("120 m deeper");
+    expect(depthRelationToBit(-35)).toBe("35 m shallower");
   });
 });

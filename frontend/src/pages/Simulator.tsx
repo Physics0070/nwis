@@ -59,6 +59,20 @@ export function nextContextDepth(previous: number | null, bitDepth: number): num
 
 const SPEEDS = [60, 300, 600, 1800, 3600];
 
+/**
+ * Describe where a historical event sits relative to the bit, in DEPTH.
+ *
+ * `distance_from_bit_m` is `event.depth_start_m - current_bit_depth` — a vertical
+ * offset, not a distance between wells. Labelling it "N m away" read as though the
+ * analogue well were that far away geographically, which for a well 8 km off is simply
+ * false. The evidence is relevant because it happened at a comparable *depth*.
+ */
+export function depthRelationToBit(offsetM: number): string {
+  const rounded = Math.round(offsetM);
+  if (rounded === 0) return "same depth";
+  return rounded > 0 ? `${rounded} m deeper` : `${Math.abs(rounded)} m shallower`;
+}
+
 /** A value that is genuinely absent is stated, never rendered as a zero. */
 function Value({
   value,
@@ -346,7 +360,7 @@ export default function Simulator() {
                           >
                             <span className="text-ink-primary">{e.well_name}</span>
                             {e.distance_from_bit_m != null && (
-                              <Tag>{formatNumber(e.distance_from_bit_m, 0)} m away</Tag>
+                              <Tag>{depthRelationToBit(e.distance_from_bit_m)}</Tag>
                             )}
                             <span className="ml-auto text-[11px] text-accent-strong">
                               Investigate
