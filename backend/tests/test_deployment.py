@@ -25,11 +25,26 @@ def test_development_never_blocks_startup():
     assert result.ok
 
 
-def test_strict_mode_rejects_the_current_local_setup():
-    """The local machine runs on the fallback backend, which production must refuse."""
+def test_strict_mode_rejects_a_fallback_database():
+    """Production must refuse to run on the local fallback backend.
+
+    Asserted against whichever backend is actually connected, because both are now
+    reachable: the Docker stack publishes Postgres on 5432, so this same checkout runs on
+    real Postgres when the containers are up and on SQLite when they are not. Pinning the
+    test to one of those made it fail the moment the stack came up — an environment fact
+    masquerading as a regression.
+    """
+    from backend.app.core.database import get_capabilities
+
     result = validate(strict=True)
-    assert not result.ok
-    assert any("fallback" in error.lower() for error in result.errors)
+
+    if get_capabilities().fallback_active:
+        assert not result.ok
+        assert any("fallback" in error.lower() for error in result.errors)
+    else:
+        # On the real stack the fallback complaint must be absent. Any remaining error
+        # is a genuine deployment problem, not the storage backend.
+        assert not any("fallback" in error.lower() for error in result.errors)
 
 
 def test_placeholder_passwords_are_recognised():

@@ -17,7 +17,7 @@ import json
 from typing import Any, Sequence
 
 from sqlalchemy import Float, String
-from sqlalchemy.types import TypeDecorator
+from sqlalchemy.types import TypeDecorator, UserDefinedType
 
 POSTGRES_DIALECTS = {"postgresql"}
 
@@ -61,6 +61,28 @@ class Vector(TypeDecorator):
         return [float(v) for v in json.loads(value)]
 
 
+class _PostgresGeography(UserDefinedType):
+    """Emits ``geography(Point,4326)`` in DDL. PostgreSQL only.
+
+    Deliberately not GeoAlchemy2. That library installs global ``before_create`` /
+    ``after_create`` listeners on every Table: the first stashes the column list in
+    ``table.info["_saved_columns"]``, the second pops it unconditionally. It identifies
+    geometry columns with ``isinstance``, which cannot see through a ``TypeDecorator``, so
+    on this schema the pair desynchronised and ``create_all`` aborted on Postgres with
+    ``KeyError: '_saved_columns'``. That is what stopped the first real
+    ``docker compose up``.
+
+    Nothing else here needed GeoAlchemy2 — the proximity queries in
+    ``repositories/wells.py`` call ``ST_Distance`` and ``ST_DWithin`` as ordinary SQL
+    functions — so the dependency is gone rather than worked around.
+    """
+
+    cache_ok = True
+
+    def get_col_spec(self, **kw):
+        return "geography(Point,4326)"
+
+
 class GeographyPoint(TypeDecorator):
     """Surface location: PostGIS geography(Point,4326) on Postgres, WKT text elsewhere.
 
@@ -74,11 +96,7 @@ class GeographyPoint(TypeDecorator):
 
     def load_dialect_impl(self, dialect):
         if dialect.name in POSTGRES_DIALECTS:
-            from geoalchemy2 import Geography
-
-            return dialect.type_descriptor(
-                Geography(geometry_type="POINT", srid=4326, spatial_index=False)
-            )
+            return dialect.type_descriptor(_PostgresGeography())
         return dialect.type_descriptor(String())
 
     def process_bind_param(self, value, dialect):

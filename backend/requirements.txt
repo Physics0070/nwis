@@ -7,7 +7,9 @@ SQLAlchemy==2.0.30
 alembic>=1.13,<2
 psycopg[binary]>=3.1,<4
 pgvector>=0.2.5
-GeoAlchemy2>=0.14,<0.16
+# Coordinate transform for the NPD wellbore positions (UTM 31 ED50 -> WGS84).
+# Imported by data_pipeline/load_database.py; its absence stopped the container loader.
+pyproj>=3.6
 PyYAML>=6.0
 python-dotenv>=1.0
 structlog>=24.1
@@ -26,6 +28,8 @@ scipy>=1.13
 sentence-transformers>=3.0
 spacy>=3.7
 pytesseract>=0.3.10
+# Fallback OCR engine, used automatically when the tesseract binary is absent.
+rapidocr-onnxruntime>=1.3
 pdfplumber>=0.11
 PyMuPDF>=1.24
 Pillow>=10.0
