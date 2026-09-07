@@ -57,14 +57,14 @@ Last updated: 2026-09-07
 
 ## Phase 6 — Telemetry feature engineering
 
-- [ ] Configurable rolling/derivative features
-- [ ] Feature spec documented
+- [x] Configurable rolling/derivative features (windows/statistics in config)
+- [x] Feature spec documented (registry entry + docs/ML.md)
 
 ## Phase 7 — Anomaly detection
 
 - [x] Isolation Forest trained (121 features, 8,130 active rows, 1.05 s)
 - [x] Contributing-feature attribution wired into risk payload
-- [ ] Persisted anomaly results
+- [x] Persisted anomaly results (8,130 scores in DB; risk engine resolves them automatically)
 
 ## Phase 8 — Contextual analogue engine
 
@@ -127,7 +127,7 @@ Last updated: 2026-09-07
 ## Phase 18 — Docs & Docker demo
 
 - [x] README, ARCHITECTURE, DATA_PIPELINE, ML, API, SETUP, DEMO, MODEL_CARD, ASSUMPTIONS
-- [ ] `docker compose up --build` verified
+- [!] `docker compose up --build` NOT verified - Docker/WSL2 absent on this machine (ASSUMPTIONS A2)
 
 ---
 
@@ -149,6 +149,8 @@ Last updated: 2026-09-07
 | Analogue engine | Proven non-proximity: 16/10-1 at 36 km ranks top-5 on geology 0.9873 despite geography score 0.2372. All top matches share Tor Fm. |
 | Document ingestion | 60 pages OCR'd at 0.968 mean confidence; 33 formation intervals recovered from scanned 1980s completion reports |
 | OCR honesty | Only 1 problem event and 0 mitigations found in these pages: they are sample descriptions, not operations narrative. Reported, not padded |
+| Anomaly scores persisted | 8,130 scores in DB (163 flagged, 2.0%); risk engine resolves them without being passed a value |
+| UI verified in a browser | Playwright: renders with zero console errors; map, telemetry, analogues, risk and evidence all populated from the API |
 | Known limitation | Chalk -> Limestone 99.8%: carbonate family is not separable on the available curves. Documented, not hidden |
 
 ## Open items / risks

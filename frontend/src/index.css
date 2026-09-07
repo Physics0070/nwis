@@ -9,6 +9,11 @@
   }
   /* Leaflet renders its own containers; keep them on the app's surface colour. */
   .leaflet-container { background: #0b1015; }
+  /* Darken the standard OSM raster tiles so the basemap sits behind the data rather
+     than competing with it. Markers are drawn as vectors and are unaffected. */
+  .nwis-map-tiles {
+    filter: invert(1) hue-rotate(185deg) brightness(0.92) saturate(0.55) contrast(0.9);
+  }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip {
     background: #18232d; color: #e8eef5;
   }

@@ -12,6 +12,10 @@ import "leaflet/dist/leaflet.css";
 import type { NearbyWell, Well } from "../lib/api";
 import { formatDepth, formatNumber } from "./primitives";
 
+const TILE_URL =
+  import.meta.env.VITE_MAP_TILE_URL ??
+  "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+
 interface Props {
   activeWell: Well;
   nearby: NearbyWell[];
@@ -36,18 +40,33 @@ export default function WellMap({ activeWell, nearby, analogueNames, onSelect }:
 
   const centre: [number, number] = [activeWell.latitude, activeWell.longitude];
 
+  // Frame the map to the wells actually being shown rather than a fixed zoom. These are
+  // offshore wells with no land nearby, so a fixed zoom gives an empty view with no
+  // sense of scale.
+  const bounds: [number, number][] = [
+    centre,
+    ...mappable.map((n) => [n.well.latitude!, n.well.longitude!] as [number, number]),
+  ];
+
   return (
     <div className="relative h-full w-full overflow-hidden rounded-card">
       <MapContainer
-        center={centre}
-        zoom={10}
+        bounds={bounds.length > 1 ? bounds : undefined}
+        boundsOptions={{ padding: [36, 36] }}
+        center={bounds.length > 1 ? undefined : centre}
+        zoom={bounds.length > 1 ? undefined : 9}
         scrollWheelZoom
         className="h-full w-full"
         style={{ background: "#0b1015" }}
       >
+        {/* Key-free OpenStreetMap tiles. The Carto dark basemap now requires an API
+            key and renders "API KEY REQUIRED" watermarks without one. A CSS filter
+            darkens the standard tiles to match the console theme instead. Override
+            VITE_MAP_TILE_URL to use a commercial provider. */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url={TILE_URL}
+          className="nwis-map-tiles"
         />
 
         {mappable.map(({ well, distance_km }) => {
