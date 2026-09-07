@@ -9,10 +9,12 @@ import Alerts from "./pages/Alerts";
 import AlertExplanation from "./pages/AlertExplanation";
 import Models from "./pages/Models";
 import Reports from "./pages/Reports";
+import Simulator from "./pages/Simulator";
 
 const NAV = [
   { to: "/", label: "Overview", end: true },
   { to: "/wells", label: "Wells" },
+  { to: "/simulator", label: "Simulator" },
   { to: "/alerts", label: "Alerts" },
   { to: "/reports", label: "Reports" },
   { to: "/models", label: "Models" },
@@ -75,6 +77,7 @@ export default function App() {
           <Route path="/wells/:wellId" element={<ActiveWell />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/alerts/:alertId" element={<AlertExplanation />} />
+          <Route path="/simulator" element={<Simulator />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/models" element={<Models />} />
           <Route path="*" element={<Navigate to="/" replace />} />
