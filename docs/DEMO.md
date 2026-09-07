@@ -19,8 +19,9 @@ something to hide.
 
 The dashboard loads from `/api/status`. Point at the counts:
 
-> 101 wells, 86,800 telemetry samples, 184 historical events, 3,620 segment embeddings —
-> and **101 of 101 wells have a real surveyed position**. Not one is placed at a guess.
+> 101 wells, 86,800 telemetry samples, 331 historical events, 3,620 segment embeddings,
+> 562 searchable report passages — and **101 of 101 wells have a real surveyed position**.
+> Not one is placed at a guess.
 
 Scroll to **System notes**. The interface volunteers its own limitations.
 
@@ -134,7 +135,40 @@ Record a decision at the bottom, submit, and note the confirmation:
 
 ---
 
-## 7 · Model insights — the numbers behind the claims (1 min)
+## 7 · Report search — institutional memory that cites its source (2 min)
+
+Open **Reports**. Type: `stuck pipe and fishing operations`.
+
+> These are passages from 1980s scanned completion reports, OCR'd at 0.957 confidence.
+> The top hit is a real fishing operation: an angle iron dropped in the hole, a reverse
+> circulating basket run to retrieve it, and **17½ hours of rig time lost**. Every result
+> carries the well, the document and the page number.
+
+Make the boundary explicit:
+
+> This retrieves passages. It does not summarise them and there is no language model
+> writing prose about your well. The engineer reads what the report actually says, and the
+> citation tells them which page to open. A generated summary would be an unciteable claim.
+
+Now type something the corpus does not contain — `orbital mechanics`:
+
+> Zero results, and the interface says the nearest passage did not clear the similarity
+> threshold. It would rather return nothing than hand you the least-bad paragraph.
+
+Worth stating if asked how the corpus was built:
+
+> The first 30 pages of these reports are geological sample descriptions. The drilling
+> narrative is deeper in, so we read all 429 pages. That took the mitigation count from
+> **0 to 48** — real recorded actions, each traceable to a page.
+>
+> It also exposed two extraction bugs worth admitting: "No tight spot" was being stored as
+> a tight-hole *event*, and a leak-off test — a planned integrity test — was being recorded
+> as an equipment failure. Both are now excluded, and the count of what was excluded and
+> why is reported rather than hidden. 37 mentions were dropped.
+
+---
+
+## 8 · Model insights — the numbers behind the claims (1 min)
 
 Open **Models**.
 
@@ -164,6 +198,17 @@ No. Demonstrate `16/10-1` at 36 km outranking nearer wells on geology 0.9873.
 headline on a dataset that is 61% shale. Macro F1 is 0.3852 against a 0.0761 baseline, and
 the per-class table shows exactly where it fails.
 
+**"Which model did you pick, and why?"**
+RandomForest, on validation wells only — a rule fixed before we looked. XGBoost scores
+better on the external holdout, but selecting on the holdout *is* selecting on the test
+set, so we did not. We then ran grouped cross-validation over 83 wells to settle it:
+XGBoost 0.3840 ± 0.0543, RandomForest 0.3667 ± 0.0462, p = 0.224.
+
+The honest finding is that **the two models are not separable** — the spread between folds
+is 3.1× the difference between the models. The original disagreement was never a contest
+between models, it was the variation between draws of wells. So we report that, and we did
+not swap the served model on noise.
+
 **"Why no risk probability?"**
 No labelled incidents exist, so a probability would be fabricated. The mode is data-driven
 and flips to supervised automatically when the evidence supports it.
@@ -185,4 +230,20 @@ lithology model is not.
 ```bash
 python -m data_pipeline.load_database --reset
 python -m data_pipeline.load_embeddings
+python -m data_pipeline.documents.embed        # rebuild the passage search index
 ```
+
+## Controls worth knowing before you present
+
+Three pages are deliberately read-only — **Overview**, **Alerts** and **Models** are
+reporting surfaces with no buttons. Everything interactive lives here:
+
+| Page | Control | What it does |
+|---|---|---|
+| Wells | search box, Previous / Next | paginates 101 wells, 25 at a time |
+| Active well | Start · Pause · Resume · Stop | server-owned replay of real telemetry |
+| Active well | speed slider, context depth | 1×–3600×; depth drives geology, analogues, risk |
+| Alert explanation | Record decision | writes an engineer action to the database |
+| Reports | search box, example chips | semantic search over 562 passages |
+
+`Previous` is greyed out on page 1 of Wells — that is correct, not a broken button.
