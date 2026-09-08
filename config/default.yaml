@@ -69,6 +69,9 @@ datasets:
     # UTM zone 31, ED50 - the same CRS family as the FORCE coordinates.
     wellbore_development_csv: "https://factpages.sodir.no/public?/Factpages/external/tableview/wellbore_development_all&rs:Command=Render&rc:Toolbar=false&rc:Parameters=f&Top100=false&IpAddress=1.1.1.1&CultureCode=en&rs:Format=CSV"
     wellbore_exploration_csv: "https://factpages.sodir.no/public?/Factpages/external/tableview/wellbore_exploration_all&rs:Command=Render&rc:Toolbar=false&rc:Parameters=f&Top100=false&IpAddress=1.1.1.1&CultureCode=en&rs:Format=CSV"
+    # Index of scanned reports per wellbore. data_pipeline/documents/ingest.py reads
+    # this file to decide which PDFs exist; without it document ingestion cannot start.
+    wellbore_document_csv: "https://factpages.sodir.no/public?/Factpages/external/tableview/wellbore_document&rs:Command=Render&rc:Toolbar=false&rc:Parameters=f&Top100=false&IpAddress=1.1.1.1&CultureCode=en&rs:Format=CSV"
     name_column: "wlbWellboreName"
     northing_column: "wlbNsUtm"
     easting_column: "wlbEwUtm"
@@ -349,6 +352,11 @@ risk:
     historical_evidence: 0.40
     rules: 0.20
   lookahead_m: 150.0            # distance ahead of bit to consider historical intervals
+  # How close a stored telemetry sample (and its anomaly score) has to be to the queried
+  # depth to describe conditions there. Beyond this the measurement belongs to a
+  # different part of the hole and the components are reported unavailable rather than
+  # being taken from whatever sample happens to be nearest.
+  telemetry_match_tolerance_m: 25.0
   evidence:
     min_analogue_similarity: 0.50
     min_supporting_wells: 1
@@ -375,6 +383,20 @@ alerts:
   cooldown_seconds: 300
   dedupe_depth_window_m: 25.0
   max_active_alerts_per_well: 20
+
+# Values the frontend needs but must not hardcode. Served through /api/status so the
+# UI and the backend can never disagree about them.
+ui:
+  # How far the bit must move before geological context is re-queried. Re-querying on
+  # every telemetry sample leaves the intelligence panels permanently loading.
+  depth_context_step_m: 25.0
+  # Lithology predictions are stored every ingestion.log_depth_step_m metres; beyond this
+  # the nearest one no longer describes the bit's position and nothing is shown.
+  lithology_match_tolerance_m: 10.0
+  # Rows per page in the well list.
+  page_size: 25
+  # Replay speeds offered as buttons. Each must lie within replay.min_speed/max_speed.
+  replay_speeds: [60, 300, 600, 1800, 3600]
 
 replay:
   default_speed: 60.0           # simulated seconds per wall-clock second

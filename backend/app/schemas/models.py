@@ -279,6 +279,9 @@ class SystemStatus(BaseModel):
     counts: dict[str, int]
     models: list[dict[str, Any]]
     warnings: list[str] = Field(default_factory=list)
+    # Thresholds, windows and step sizes the UI renders with. Served from configuration
+    # so no number is duplicated in the frontend.
+    config: dict[str, Any] = Field(default_factory=dict)
 
 
 class PassageMatchOut(BaseModel):

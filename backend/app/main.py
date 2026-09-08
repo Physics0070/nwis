@@ -19,6 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from backend.app.api.routes import intelligence, replay, wells
 from backend.app.core.database import get_capabilities, get_engine
 from backend.app.core.startup import run_startup_checks
+from backend.app.services import document_search
 from backend.app.models import Base
 from nwis_common import configure_logging, get_config, get_logger
 
@@ -70,7 +71,14 @@ async def lifespan(app: FastAPI):
     # Fails fast in production on a fallback database, a placeholder password or a
     # wildcard CORS origin. Warnings only in development.
     run_startup_checks()
+
+    # Load the report-search encoder off the request path, in a thread so startup is not
+    # blocked by it. Without this the first search pays the model load — 14.5 s measured
+    # — which looks like a broken feature rather than a cold cache.
+    warm = asyncio.create_task(asyncio.to_thread(document_search.warm_encoder))
+
     yield
+    warm.cancel()
     log.info("api_shutdown")
 
 

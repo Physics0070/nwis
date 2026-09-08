@@ -38,3 +38,19 @@ def ensure_dir(value: str | os.PathLike[str]) -> Path:
     path = resolve_path(value)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def citation_path(value: str | os.PathLike[str]) -> str:
+    """A source path fit to show an engineer, and to store as provenance.
+
+    Absolute paths are machine-specific: an event citing
+    ``/Users/someone/Downloads/nwis/data/raw/...`` is not reproducible evidence, it is a
+    fact about the laptop that ran the pipeline, and it leaks that layout into the UI.
+    Paths inside the repository are recorded relative to its root; anything outside is
+    returned unchanged, because truncating it would be worse than showing it.
+    """
+    path = Path(value)
+    try:
+        return str(path.resolve().relative_to(repo_root()))
+    except ValueError:
+        return str(path)

@@ -181,3 +181,82 @@ def test_search_still_reports_a_real_outage_as_503(client, loaded, monkeypatch):
     monkeypatch.setattr(document_search, "search", unavailable)
     response = client.get("/api/documents/search", params={"q": "stuck pipe"})
     assert response.status_code == 503, response.text
+
+
+def test_status_serves_the_ui_thresholds(client):
+    """The frontend must not carry its own copy of a threshold.
+
+    Every value the UI renders with — the depth step it quantises to, the speeds it
+    offers, the look-ahead window it draws the radar over — is served from here, so the
+    picture and the query behind it cannot disagree.
+    """
+    config = client.get("/api/status").json()["config"]
+    for key in (
+        "depth_context_step_m",
+        "lithology_match_tolerance_m",
+        "page_size",
+        "replay_speeds",
+        "risk_lookahead_m",
+    ):
+        assert key in config, f"{key} is not served to the UI"
+    assert config["depth_context_step_m"] > 0
+    assert config["risk_lookahead_m"] > 0
+    assert config["replay_speeds"], "the UI has no speeds to offer"
+    # Every offered speed must be one the replay engine will actually accept.
+    for speed in config["replay_speeds"]:
+        assert config["replay_min_speed"] <= speed <= config["replay_max_speed"]
+
+
+def test_risk_uses_telemetry_from_the_queried_depth(client, loaded):
+    """Risk at a depth must describe that depth.
+
+    Resolving telemetry as "the most recent stored sample" froze the measured half of
+    every assessment at the end of the recording: two very different depths returned
+    identical rule inputs and an identical anomaly score, while the historical half moved
+    with the bit. The regression is subtle and entirely invisible in the UI, so it is
+    pinned here.
+    """
+    wells = client.get("/api/wells?has_telemetry=true&limit=1").json()["items"]
+    if not wells:
+        pytest.skip("no well with telemetry is loaded")
+    well_id = wells[0]["id"]
+
+    samples = client.get(f"/api/wells/{well_id}/telemetry?limit=20000").json()
+    depths = sorted({s["bit_depth_m"] for s in samples if s["bit_depth_m"] is not None})
+    if len(depths) < 2:
+        pytest.skip("this well never changes depth, so there is nothing to distinguish")
+
+    shallow = client.get(f"/api/wells/{well_id}/risk?depth_m={depths[0]}").json()
+    deep = client.get(f"/api/wells/{well_id}/risk?depth_m={depths[-1]}").json()
+
+    def note_text(payload):
+        return " ".join(payload["notes"])
+
+    # Each assessment must say where its telemetry came from, and the two must not be
+    # the same instant.
+    assert "Telemetry taken from the sample recorded at" in note_text(
+        shallow
+    ) or "No telemetry within" in note_text(shallow)
+    assert note_text(shallow) != note_text(deep), (
+        "both depths resolved to the same telemetry, so depth is being ignored"
+    )
+
+
+def test_risk_refuses_telemetry_from_a_different_part_of_the_hole(client, loaded):
+    """Beyond the configured tolerance, no measurement is borrowed.
+
+    A reading from 2 km away is not evidence about conditions here. The engine must say
+    so rather than let the nearest row stand in.
+    """
+    wells = client.get("/api/wells?has_telemetry=true&limit=1").json()["items"]
+    if not wells:
+        pytest.skip("no well with telemetry is loaded")
+    well_id = wells[0]["id"]
+
+    # A depth far past the end of any Volve recording.
+    payload = client.get(f"/api/wells/{well_id}/risk?depth_m=9000").json()
+    notes = " ".join(payload["notes"])
+    assert "No telemetry within" in notes
+    assert all(c["name"] != "rules" for c in payload["components"]), (
+        "rules were evaluated on measurements from a different depth"
+    )

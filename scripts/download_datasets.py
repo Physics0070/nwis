@@ -131,6 +131,7 @@ def fetch_npd(config, *, force: bool = False) -> None:
     for key, filename in (
         ("wellbore_development_csv", "wellbore_development_all.csv"),
         ("wellbore_exploration_csv", "wellbore_exploration_all.csv"),
+        ("wellbore_document_csv", "wellbore_document.csv"),
     ):
         url = config.get(f"datasets.npd.{key}")
         try:

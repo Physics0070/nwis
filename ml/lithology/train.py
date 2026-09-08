@@ -66,22 +66,40 @@ def negative_macro_f1(y_true, y_pred):
 def resolve_device(preference: str) -> str:
     """Pick the XGBoost compute device.
 
-    "auto" tries a tiny GPU fit and falls back to CPU if anything about the CUDA path
-    is unavailable, so the same configuration runs on a workstation with a GPU and on
-    a CI box without one. The resolved device is recorded in the model registry.
+    "auto" tries a tiny GPU fit, so the same configuration runs on a workstation with a
+    GPU and on a machine without one. The resolved device is recorded in the model
+    registry.
+
+    The probe asks the fitted booster which device it *actually* used rather than
+    treating a successful fit as proof of a GPU. XGBoost does not raise when CUDA is
+    absent: it emits a warning — "Device is changed from GPU to CPU as we couldn't find
+    any available GPU on the system" — and trains on the CPU anyway. Catching exceptions
+    alone therefore recorded ``device: cuda`` in the registry, and the Models page showed
+    that to an engineer, on a machine with no GPU at all. A measured figure that is not
+    what happened is worse than no figure.
     """
     preference = (preference or "auto").lower()
     if preference != "auto":
         return preference
     try:
+        import json as _json
+
         import numpy as _np
         from xgboost import XGBClassifier as _XGB
 
-        _XGB(n_estimators=1, device="cuda", tree_method="hist", verbosity=0).fit(
-            _np.zeros((8, 2), dtype="float32"), _np.array([0, 1] * 4)
+        probe = _XGB(n_estimators=1, device="cuda", tree_method="hist", verbosity=0)
+        probe.fit(_np.zeros((8, 2), dtype="float32"), _np.array([0, 1] * 4))
+        resolved = str(
+            _json.loads(probe.get_booster().save_config())["learner"]["generic_param"][
+                "device"
+            ]
         )
-        log.info("gpu_detected", device="cuda")
-        return "cuda"
+        if resolved.startswith("cuda") or resolved.startswith("gpu"):
+            log.info("gpu_detected", device=resolved)
+            return resolved
+        log.info("gpu_unavailable", device="cpu",
+                 reason=f"xgboost resolved the device to {resolved!r}")
+        return "cpu"
     except Exception as exc:
         log.info("gpu_unavailable", device="cpu", reason=type(exc).__name__)
         return "cpu"

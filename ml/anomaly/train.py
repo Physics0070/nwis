@@ -102,6 +102,63 @@ def build_features(frame: pd.DataFrame, config) -> tuple[pd.DataFrame, list[str]
     return features, feature_columns, spec
 
 
+def robust_deviation_attribution(
+    values: pd.DataFrame, feature_columns: list[str], top_n: int
+) -> list[list[dict]]:
+    """Rank, per row, the features furthest from their normal operating value.
+
+    This is **not** an Isolation Forest attribution — the forest does not expose one, and
+    inventing an internal explanation for it would be exactly the kind of unsupported
+    claim this project refuses. What it is, and what the API says it is, is a deviation
+    score: how far each measurement sits from the median of the same feature over the
+    operationally-active rows the model was fitted on, in standard deviations of that
+    feature.
+
+    That is a statement about the data, verifiable from the data, and it is the answer to
+    the question an engineer actually asks of a flagged sample: *which reading is odd?*
+
+    The scale is the standard deviation rather than the interquartile range, which was
+    measured to be the wrong choice here. Many engineered features — the rolling slopes
+    especially — are zero for well over half the active rows, so their IQR is
+    approximately zero and every non-zero value divides out to hundreds of "sigma". The
+    ranking then reported the same handful of slope features for every sample, which is
+    not an explanation. The standard deviation is inflated by exactly those spikes, and
+    ranks the readings that are genuinely unusual for the row at hand.
+
+    Features with no spread at all are skipped: everything is infinitely far from a
+    constant.
+    """
+    numeric = values[feature_columns].astype("float64")
+    median = numeric.median()
+    scale = numeric.std().replace(0.0, np.nan)
+    deviation = ((numeric - median) / scale).abs()
+
+    usable = [c for c in feature_columns if not pd.isna(scale.get(c, np.nan))]
+    if not usable:
+        return [[] for _ in range(len(numeric))]
+
+    subset = deviation[usable].to_numpy()
+    names = np.asarray(usable)
+    order = np.argsort(-np.nan_to_num(subset, nan=-1.0), axis=1)[:, :top_n]
+
+    attributions: list[list[dict]] = []
+    for row_index in range(subset.shape[0]):
+        row = []
+        for column_index in order[row_index]:
+            value = subset[row_index, column_index]
+            if not np.isfinite(value):
+                continue
+            row.append(
+                {
+                    "feature": str(names[column_index]),
+                    "contribution": round(float(value), 3),
+                    "unit": "sigma from the active-row median",
+                }
+            )
+        attributions.append(row)
+    return attributions
+
+
 def main() -> int:
     config = get_config()
     processed = config.path("paths.data_processed") / "volve"
@@ -149,6 +206,12 @@ def main() -> int:
 
     active["anomaly_score"] = normalised
     active["is_anomaly"] = predictions == -1
+    # Why this sample is unusual, stored per row so the API can explain a flag instead of
+    # reporting a bare number. See robust_deviation_attribution for what it does and does
+    # not claim.
+    active["contributing_features"] = robust_deviation_attribution(
+        active, feature_columns, int(config.get("anomaly.attribution_top_n"))
+    )
 
     achieved = float((predictions == -1).mean())
     per_well = (
@@ -236,13 +299,24 @@ def main() -> int:
                 "operations, not for drilling ahead.",
                 "The contamination rate is an assumption about how much of the data is "
                 "unusual, not a measurement. Changing it changes the flag count directly.",
+                "Contributing features are a deviation score against the active-row "
+                "median, not an attribution of the forest's decision. They say which "
+                "reading is unusual, not which reading the model relied on.",
             ],
         )
     )
 
     scored_path = processed / "anomaly_scores.parquet"
-    active[["well_name", "timestamp", "bit_depth_m", "anomaly_score", "is_anomaly"]] \
-        .to_parquet(scored_path, index=False)
+    active[
+        [
+            "well_name",
+            "timestamp",
+            "bit_depth_m",
+            "anomaly_score",
+            "is_anomaly",
+            "contributing_features",
+        ]
+    ].to_parquet(scored_path, index=False)
 
     log.info(
         "anomaly_trained",

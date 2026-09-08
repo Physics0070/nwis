@@ -27,6 +27,21 @@ from nwis_common import get_config, get_logger
 log = get_logger("nwis.load.anomaly")
 
 
+def _as_features(value) -> list[dict]:
+    """Normalise the stored attribution into plain JSON-serialisable dicts.
+
+    Parquet round-trips a list column as a NumPy array of dicts, which SQLAlchemy's JSON
+    type cannot serialise. An absent column yields an empty list rather than an error, so
+    scores produced before attribution existed still load.
+    """
+    if value is None:
+        return []
+    try:
+        return [dict(item) for item in value]
+    except TypeError:
+        return []
+
+
 def main() -> int:
     config = get_config()
     path = config.path("paths.data_processed") / "volve" / "anomaly_scores.parquet"
@@ -72,8 +87,11 @@ def main() -> int:
                     "score": float(values["anomaly_score"]),
                     "is_anomaly": bool(values["is_anomaly"]),
                     # The detector reports unusual behaviour, not a named failure mode,
-                    # so no event type is recorded here.
-                    "contributing_features": [],
+                    # so no event type is recorded here — only which measurements were
+                    # furthest from normal, as computed at scoring time.
+                    "contributing_features": _as_features(
+                        values.get("contributing_features")
+                    ),
                     "model_version_id": model.id if model else None,
                 }
             )

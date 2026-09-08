@@ -36,7 +36,7 @@ import pandas as pd
 
 from data_pipeline.common.units import convert_series
 from data_pipeline.volve import witsml
-from nwis_common import get_config, get_logger
+from nwis_common import citation_path, get_config, get_logger
 from nwis_common.paths import ensure_dir
 
 log = get_logger("nwis.volve.prepare")
@@ -114,7 +114,7 @@ def read_well_telemetry(well_dir: Path, config) -> tuple[pd.DataFrame, dict]:
             out[canonical] = values
 
         out["source_log"] = log_object.name
-        out["source_file"] = str(log_path)
+        out["source_file"] = citation_path(log_path)
         frames.append(out)
         report["logs_read"] += 1
         report["rows_raw"] += len(out)

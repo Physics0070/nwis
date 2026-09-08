@@ -66,6 +66,28 @@ def _get_encoder(config):
     return _encoder
 
 
+def warm_encoder() -> None:
+    """Load the query encoder ahead of the first search.
+
+    Measured on a cold process: the first `/api/documents/search` took **14.5 s** while
+    the sentence-transformer loaded, and every subsequent one took about half a second.
+    Fourteen seconds of spinner on the institutional-memory demo reads as a broken
+    feature. Warming it at startup moves that cost off the request path.
+
+    Failure here is not fatal and is not hidden: the encoder simply loads lazily on the
+    first query as before, and the reason is logged.
+    """
+    try:
+        _get_encoder(get_config())
+        log.info("document_encoder_warm")
+    except Exception as exc:  # pragma: no cover - depends on the model cache
+        log.warning(
+            "document_encoder_warm_failed",
+            error=str(exc),
+            note="the encoder will load on the first search instead",
+        )
+
+
 def corpus_status(session: Session) -> dict:
     """How much of the corpus is actually searchable."""
     from sqlalchemy import func

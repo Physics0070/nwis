@@ -25,6 +25,8 @@ from xml.etree import ElementTree
 import numpy as np
 import pandas as pd
 
+from nwis_common import citation_path
+
 WITSML_NS = "{http://www.witsml.org/schemas/1series}"
 
 # The mirror escapes '/' in directory names as '$47$' (its ASCII code).
@@ -124,7 +126,7 @@ def read_well_header(path: Path) -> WellHeader | None:
         datums=datums,
         latitude=latitude,
         longitude=longitude,
-        source_file=str(path),
+        source_file=citation_path(path),
     )
 
 
@@ -155,7 +157,7 @@ def read_wellbore_header(path: Path) -> WellboreHeader | None:
         status=_text(wellbore, "statusWellbore"),
         md_planned_m=_float(wellbore, "mdPlanned"),
         kickoff_time=_text(wellbore, "dTimKickoff"),
-        source_file=str(path),
+        source_file=citation_path(path),
     )
 
 
@@ -246,7 +248,7 @@ def read_log(path: Path) -> LogObject | None:
         service_company=_text(log_element, "serviceCompany"),
         channels=channels,
         data=frame,
-        source_file=str(path),
+        source_file=citation_path(path),
     )
 
 
@@ -292,7 +294,7 @@ def read_trajectory(path: Path) -> pd.DataFrame:
                     "dogleg_severity_deg_per_m": np.degrees(dls)
                     if (dls is not None and _uom(station, "dls") == "rad/m")
                     else dls,
-                    "source_file": str(path),
+                    "source_file": citation_path(path),
                 }
             )
     return pd.DataFrame(records)
@@ -323,7 +325,7 @@ def read_messages(path: Path) -> pd.DataFrame:
                 "severity": _text(message, "severity"),
                 "text": _text(message, "messageText") or _text(message, "name") or "",
                 "source_name": _text(common, "sourceName") if common is not None else None,
-                "source_file": str(path),
+                "source_file": citation_path(path),
             }
         )
     return pd.DataFrame(records)
@@ -350,7 +352,7 @@ def read_bha_runs(path: Path) -> pd.DataFrame:
                 "end_time": _text(run, "dTimStop"),
                 "md_start_m": _float(run, "tubular"),
                 "drilling_hours": _float(run, "tubular"),
-                "source_file": str(path),
+                "source_file": citation_path(path),
             }
         )
     return pd.DataFrame(records)

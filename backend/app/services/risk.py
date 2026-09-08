@@ -141,7 +141,21 @@ def gather_historical_evidence(
     lookahead_m: float,
     min_similarity: float,
 ) -> list[HistoricalEvidence]:
-    """Historical events in analogue wells near or just ahead of the current depth."""
+    """Historical **risk** events in analogue wells near or just ahead of the bit.
+
+    Only categorised events count. The Volve WITSML message stream is an operations log,
+    not an incident log: 184 of its 185 records are uncategorised remarks such as
+    "Toolbox Talk Prior to Rig Up Tubing Equipment" and "Prep move to F14". Counting
+    those as historical evidence produced a MEDIUM indicator "supported by 65 historical
+    records" that were, in fact, routine workover housekeeping — an invented risk signal
+    assembled from real rows, which is the most dangerous kind.
+
+    A category is assigned only where the extractor recognised an actual problem class
+    (wellbore instability, losses, and so on), so ``category IS NOT NULL`` is exactly the
+    line between "something went wrong here" and "something happened here". Uncategorised
+    remarks stay visible on the borehole track as recorded events; they simply do not
+    raise a risk indicator.
+    """
     if depth_m is None:
         return []
 
@@ -153,6 +167,7 @@ def gather_historical_evidence(
             session.execute(
                 select(DrillingEvent)
                 .where(DrillingEvent.well_id == match.well.id)
+                .where(DrillingEvent.category.isnot(None))
                 .where(DrillingEvent.depth_start_m.isnot(None))
                 .where(DrillingEvent.depth_start_m >= depth_m - lookahead_m)
                 .where(DrillingEvent.depth_start_m <= depth_m + lookahead_m)
@@ -191,6 +206,11 @@ def gather_historical_evidence(
                             "action_taken": m.action_taken,
                             "outcome": m.outcome,
                             "outcome_status": m.outcome_status,
+                            # Provenance travels with the action. The investigation
+                            # drawer renders it; without these keys the "source" line
+                            # was silently absent on every mitigation.
+                            "source_dataset": m.source_dataset,
+                            "source_reference": m.source_reference,
                         }
                         for m in mitigations
                     ],
@@ -198,6 +218,27 @@ def gather_historical_evidence(
             )
     evidence.sort(key=lambda e: (-e.similarity_score, abs(e.distance_from_bit_m or 0)))
     return evidence
+
+
+def nearest_offset_m(evidence: list[HistoricalEvidence], lookahead_m: float) -> float:
+    """How far the closest piece of evidence sits from the bit, in metres.
+
+    An event with no recorded offset counts as the full look-ahead window away — the
+    weakest position — because an unplaced record is not evidence about this depth.
+
+    Extracted from the scoring expression because the obvious one-liner,
+    ``min(abs(e.distance_from_bit_m or lookahead) ...)``, is wrong in a way that reads as
+    correct: an offset of exactly 0.0 is falsy, so a historical event recorded at
+    precisely the depth the bit has reached — the strongest evidence there is — was
+    replaced by the full window and scored as the weakest. Measured on real data before
+    the fix: Volve F-4 reaches 2368.4 m, 16/7-5 records a fishing operation at 2368 m,
+    and the historical-evidence component came back 0.000.
+    """
+    offsets = [
+        abs(e.distance_from_bit_m) if e.distance_from_bit_m is not None else lookahead_m
+        for e in evidence
+    ]
+    return min(offsets) if offsets else lookahead_m
 
 
 def evaluate_rules(measurements: dict, config) -> tuple[float, list[str]]:
@@ -271,7 +312,7 @@ def assess(
     if evidence and len(supporting_wells) >= min_wells:
         # Strength grows with how close the nearest historical event is and how similar
         # the wells that recorded it are.
-        nearest = min(abs(e.distance_from_bit_m or lookahead) for e in evidence)
+        nearest = nearest_offset_m(evidence, lookahead)
         proximity = max(0.0, 1.0 - (nearest / lookahead))
         similarity = max(e.similarity_score for e in evidence)
         components.append(
@@ -285,8 +326,9 @@ def assess(
         )
     else:
         notes.append(
-            "No historical events found within the look-ahead window in wells above the "
-            "similarity threshold."
+            "No categorised historical risk event was found within the look-ahead window "
+            "in wells above the similarity threshold. Uncategorised operational remarks "
+            "are not counted as risk evidence."
         )
 
     rule_score, triggered = evaluate_rules(measurements or {}, config)

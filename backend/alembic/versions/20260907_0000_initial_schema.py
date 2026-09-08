@@ -43,6 +43,33 @@ def upgrade() -> None:
         return
 
     # Telemetry is append-only time series: a hypertable partitions it by time.
+    #
+    # TimescaleDB requires the partitioning column to appear in every unique index on the
+    # table, and the schema's primary key is `id` alone. `create_hypertable` therefore
+    # failed outright with "cannot create a unique index without the column
+    # \"recorded_at\" (used in partitioning)" — so the hypertable was never created on
+    # any Docker run, and /api/status reported an ordinary indexed table.
+    #
+    # Widening the key to (id, recorded_at) is the standard TimescaleDB pattern. `id` is
+    # still generated from its own sequence and still uniquely identifies a row, so the
+    # ORM mapping is unaffected. This runs on PostgreSQL only; the fallback backend keeps
+    # the plain single-column key.
+    op.execute(
+        sa.text(
+            "ALTER TABLE telemetry_samples DROP CONSTRAINT IF EXISTS pk_telemetry_samples"
+        )
+    )
+    op.execute(
+        sa.text(
+            "ALTER TABLE telemetry_samples DROP CONSTRAINT IF EXISTS telemetry_samples_pkey"
+        )
+    )
+    op.execute(
+        sa.text(
+            "ALTER TABLE telemetry_samples "
+            "ADD CONSTRAINT pk_telemetry_samples PRIMARY KEY (id, recorded_at)"
+        )
+    )
     op.execute(
         sa.text(
             "SELECT create_hypertable('telemetry_samples', 'recorded_at', "

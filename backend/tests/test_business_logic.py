@@ -11,6 +11,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+import inspect
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -281,3 +283,63 @@ def test_unevaluable_risk_is_flagged_not_scored_as_zero():
             assert real.evaluated is True
     finally:
         session.close()
+
+
+def test_uncategorised_remarks_are_not_historical_risk_evidence():
+    """A routine operations log must not become a risk signal.
+
+    The Volve WITSML message stream is an operations log: "Toolbox Talk Prior to Rig Up
+    Tubing Equipment" is a real record, and it is not evidence that anything went wrong.
+    Counting uncategorised remarks produced a MEDIUM indicator "supported by 65
+    historical records" of exactly that kind — a fabricated risk built out of real rows.
+    The query must filter on category, and this pins that it still does.
+    """
+    from backend.app.services import risk as risk_service
+
+    source = inspect.getsource(risk_service.gather_historical_evidence)
+    assert "DrillingEvent.category.isnot(None)" in source, (
+        "historical evidence no longer filters to categorised events, so routine "
+        "operational remarks can raise a risk indicator again"
+    )
+
+
+def test_evidence_at_the_bit_is_the_strongest_not_the_weakest():
+    """An event at exactly the bit's depth must score highest, not lowest.
+
+    The proximity term was written ``abs(e.distance_from_bit_m or lookahead)``. An offset
+    of 0.0 is falsy, so the strongest possible evidence — a historical event recorded at
+    precisely the depth the bit has reached — was substituted with the full look-ahead
+    window and scored as the weakest. Measured on real data: Volve F-4 reaches 2368.4 m,
+    16/7-5 records a fishing operation at 2368 m, and the component came back 0.000.
+    """
+    from backend.app.services.risk import HistoricalEvidence, nearest_offset_m
+
+    def evidence(offset):
+        return HistoricalEvidence(
+            well_name="16/7-5",
+            similarity_score=0.77,
+            event_id=1,
+            event_type="fishing",
+            depth_start_m=2368.0,
+            depth_end_m=None,
+            distance_from_bit_m=offset,
+            description="",
+            formation_name=None,
+            depth_source=None,
+            source_dataset=None,
+            source_reference=None,
+        )
+
+    lookahead = 150.0
+    assert nearest_offset_m([evidence(0.0)], lookahead) == 0.0
+    assert nearest_offset_m([evidence(-40.0), evidence(90.0)], lookahead) == 40.0
+    # No recorded offset is the weakest position, not the strongest.
+    assert nearest_offset_m([evidence(None)], lookahead) == lookahead
+    assert nearest_offset_m([], lookahead) == lookahead
+
+    # And the proximity term the engine derives from it must rank them accordingly.
+    def proximity(offset):
+        return max(0.0, 1.0 - nearest_offset_m([evidence(offset)], lookahead) / lookahead)
+
+    assert proximity(0.0) == 1.0
+    assert proximity(0.0) > proximity(75.0) > proximity(149.0)

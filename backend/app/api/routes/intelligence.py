@@ -38,6 +38,50 @@ router = APIRouter(prefix="/api", tags=["intelligence"])
 VALID_DECISIONS = {"accepted", "rejected", "investigating", "resolved"}
 
 
+def _sample_near_depth(session: Session, well_id: int, depth_m: float | None):
+    """The stored telemetry sample closest to a depth, or the last one when no depth.
+
+    Ties on depth — and there are many, because a bit sits still while tripping — are
+    broken by taking the latest, which is the most recent state of the hole there.
+    """
+    statement = select(TelemetrySample).where(TelemetrySample.well_id == well_id)
+    if depth_m is None:
+        statement = statement.order_by(TelemetrySample.recorded_at.desc())
+    else:
+        statement = statement.where(TelemetrySample.bit_depth_m.isnot(None)).order_by(
+            func.abs(TelemetrySample.bit_depth_m - depth_m),
+            TelemetrySample.recorded_at.desc(),
+        )
+    return session.execute(statement.limit(1)).scalars().first()
+
+
+def _anomaly_near_depth(
+    session: Session, well_id: int, depth_m: float | None, tolerance_m: float
+):
+    """The anomaly score closest to a depth, within tolerance.
+
+    A score from a different part of the hole is not evidence about this one, so nothing
+    is returned rather than the least-distant row at any distance.
+    """
+    statement = select(AnomalyScore).where(AnomalyScore.well_id == well_id)
+    if depth_m is None:
+        return session.execute(
+            statement.order_by(AnomalyScore.recorded_at.desc()).limit(1)
+        ).scalars().first()
+    row = (
+        session.execute(
+            statement.where(AnomalyScore.depth_m.isnot(None))
+            .order_by(func.abs(AnomalyScore.depth_m - depth_m), AnomalyScore.recorded_at.desc())
+            .limit(1)
+        )
+        .scalars()
+        .first()
+    )
+    if row is None or row.depth_m is None or abs(row.depth_m - depth_m) > tolerance_m:
+        return None
+    return row
+
+
 @router.get("/wells/{well_id}/risk", response_model=RiskAssessmentOut)
 def evaluate_risk(
     well_id: int,
@@ -48,41 +92,75 @@ def evaluate_risk(
 ):
     """Evaluate risk at a depth and return the full explanation.
 
-    ``anomaly_score`` may be supplied by the live pipeline; when omitted the most recent
-    stored score for the well is used, and if there is none the anomaly component is
-    reported as unavailable rather than assumed to be zero.
+    Telemetry, the anomaly score and its contributing features are all resolved at
+    ``depth_m`` — the sample nearest that depth, within
+    ``risk.telemetry_match_tolerance_m``. A measurement from elsewhere in the hole is not
+    evidence about this depth, so beyond that tolerance the component is reported as
+    unavailable rather than borrowed. With no depth given, the most recent sample is used.
+
+    ``anomaly_score`` may still be supplied by a caller that has one; when it is, no
+    stored score is looked up.
     """
     well = session.get(Well, well_id)
     if well is None:
         raise HTTPException(status_code=404, detail=f"Well {well_id} not found")
 
-    measurements: dict = {}
-    if anomaly_score is None:
-        latest = (
-            session.execute(
-                select(AnomalyScore)
-                .where(AnomalyScore.well_id == well_id)
-                .order_by(AnomalyScore.recorded_at.desc())
-            )
-            .scalars()
-            .first()
-        )
-        if latest is not None:
-            anomaly_score = latest.score
+    config = get_config()
+    tolerance = float(config.get("risk.telemetry_match_tolerance_m"))
+    notes: list[str] = []
 
-    sample = (
-        session.execute(
-            select(TelemetrySample)
-            .where(TelemetrySample.well_id == well_id)
-            .order_by(TelemetrySample.recorded_at.desc())
-        )
-        .scalars()
-        .first()
-    )
+    # Resolve telemetry AT THE QUERIED DEPTH. Taking the most recent sample instead
+    # froze the anomaly score and the rule inputs at the end of the recording, so the
+    # measured half of every assessment described the same instant no matter which
+    # depth was asked about — while the historical half moved with the bit.
+    sample = _sample_near_depth(session, well_id, depth_m)
     if sample is not None and sample.channels:
         measurements = {k: v for k, v in sample.channels.items() if v is not None}
         if depth_m is None:
             depth_m = sample.bit_depth_m
+        offset = (
+            abs(sample.bit_depth_m - depth_m)
+            if sample.bit_depth_m is not None and depth_m is not None
+            else None
+        )
+        if offset is not None and offset > tolerance:
+            # The nearest sample belongs to a different part of the hole. Reporting its
+            # readings as conditions here would be a fabrication.
+            measurements = {}
+            notes.append(
+                f"No telemetry within {tolerance:.0f} m of {depth_m:.0f} m: the nearest "
+                f"stored sample is {offset:.0f} m away, so no measurement was used."
+            )
+        else:
+            notes.append(
+                f"Telemetry taken from the sample recorded at "
+                f"{sample.recorded_at.isoformat()}"
+                + (f", {offset:.0f} m from the queried depth." if offset is not None else ".")
+            )
+    else:
+        measurements = {}
+
+    contributing_features: list[dict] | None = None
+    if anomaly_score is None:
+        scored = _anomaly_near_depth(session, well_id, depth_m, tolerance)
+        if scored is not None:
+            anomaly_score = scored.score
+            # The features that pushed this sample away from normal. They are what makes
+            # the anomaly component explainable rather than a bare number.
+            contributing_features = list(scored.contributing_features or [])
+            notes.append(
+                "Anomaly score resolved at "
+                + (
+                    f"{scored.depth_m:.0f} m."
+                    if scored.depth_m is not None
+                    else "the nearest scored sample."
+                )
+            )
+        else:
+            notes.append(
+                f"No anomaly score within {tolerance:.0f} m of this depth, so the "
+                "anomaly component was not computed."
+            )
 
     result = risk_service.assess(
         session,
@@ -90,7 +168,9 @@ def evaluate_risk(
         depth_m=depth_m,
         anomaly_score=anomaly_score,
         measurements=measurements,
+        contributing_features=contributing_features,
     )
+    result.notes.extend(notes)
     if persist:
         risk_service.persist(session, result)
         session.commit()
@@ -339,7 +419,20 @@ def system_status(session: Session = Depends(get_session)):
         warnings.append("No models are registered; prediction endpoints will report "
                         "that a model is unavailable.")
 
+    ui = config.section("ui")
     return SystemStatus(
+        config={
+            "depth_context_step_m": float(ui["depth_context_step_m"]),
+            "lithology_match_tolerance_m": float(ui["lithology_match_tolerance_m"]),
+            "page_size": int(ui["page_size"]),
+            "replay_speeds": [float(s) for s in ui["replay_speeds"]],
+            # The look-ahead window the risk engine actually used to gather historical
+            # evidence. The depth radar draws its scale from this, so the picture cannot
+            # disagree with the query behind it.
+            "risk_lookahead_m": float(config.get("risk.lookahead_m")),
+            "replay_min_speed": float(config.get("replay.min_speed")),
+            "replay_max_speed": float(config.get("replay.max_speed")),
+        },
         application=str(config.get("app.name")),
         environment=config.environment,
         database=capabilities.as_dict(),
