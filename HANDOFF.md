@@ -1,7 +1,7 @@
 # NWIS — Handoff
 
-Repo: `D:\SOHAM ALL\hackathons\SIH` · `main` · github.com/Physics0070/nwis
-Last session: 2026-09-08 · 35 commits
+Repo: `github.com/Physics0070/nwis` · `main`
+Last session: 2026-09-08 — **final feature audit, completion and demo verification**
 
 ---
 
@@ -18,24 +18,29 @@ Unknown values say so instead of rendering a zero.
 
 ## 2. Current state
 
-**Working.** 68 backend + 22 frontend tests pass. 87 API requests swept, 0 server errors.
-0 console errors. Demo runs at http://localhost:5173.
+**Working, on both storage backends.** 86 backend + 30 frontend tests pass. TypeScript
+clean, production build clean, no JavaScript console errors. The full judge journey was
+walked in a browser on the SQLite fallback *and* on the Docker Postgres stack.
 
-| | Measured |
+| | Measured 2026-09-08 |
 |---|---|
-| Wells | 101 (98 FORCE + 3 Volve), 0 without a real surveyed position |
-| Telemetry | 86,800 samples across 3 Volve wells, 16 channels |
-| Events / mitigations | 331 / 48 |
-| Documents | 2 reports, 429 pages OCR'd, 562 passages embedded |
-| Simulator | built, verified end to end |
+| Wells | 101 (98 FORCE + 3 Volve), 101 with a real surveyed position |
+| Telemetry | 86,800 samples across 3 Volve wells |
+| Drilling events | 243 — 184 WITSML remarks, 59 categorised from reports |
+| … with a recovered depth | **10** — only these can serve as depth-matched risk evidence |
+| Mitigations | 15, each citing a document and page |
+| Documents | 8 reports, 320 pages OCR'd, 410 passages, **410 of 410 embedded** |
+| Segment embeddings | 3,620 · Anomaly scores 8,130 · Lithology predictions 18,842 |
 
-**Docker: partially verified.** The database container is healthy with `postgis`,
-`timescaledb` and `vector` all present and `fallback_active: false`. All four images build.
-**The loader still fails** — see §6. The app therefore still runs on the SQLite fallback,
-which the UI header states plainly.
+**Docker: verified.** `fallback_active: false`, with postgis 3.6.4, timescaledb 2.29.2 and
+vector 0.8.6 all active, the telemetry hypertable created (3 chunks, 86,800 rows), the GIST
+index and both ivfflat indexes present. The whole knowledge base loads and the simulator
+runs against it.
 
-**Open:** the loader dependency; Investigate does not pause the replay; frontend threshold
-constants are still hardcoded.
+Full detail: **`docs/FINAL_QA_REPORT.md`**, **`docs/FEATURE_AUDIT.md`**,
+**`docs/FEATURE_COMPLETION_PLAN.md`**, **`docs/MASTER_QA_CHECKLIST.md`**.
+
+**Open:** report-corpus coverage (8 of 388) and extraction precision — see §6.
 
 ---
 
@@ -43,93 +48,108 @@ constants are still hardcoded.
 
 | Path | Role |
 |---|---|
-| `frontend/src/pages/Simulator.tsx` | the simulator |
-| `frontend/src/components/DrillTrack.tsx` | borehole depth visualisation |
-| `frontend/src/pages/ActiveWell.tsx` | main dashboard (shares the risk panel fix) |
+| `frontend/src/pages/Simulator.tsx` | the simulator — radar, seek, investigate/pause, report search |
+| `frontend/src/components/DepthRadar.tsx` | the historical risk radar |
+| `frontend/src/hooks/useTelemetryStream.ts` | WebSocket + reconnect |
 | `frontend/src/lib/api.ts` | **every** UI value passes through here |
-| `backend/app/services/risk.py` | risk assessment + the new `evaluated` flag |
-| `backend/app/schemas/models.py` | API response shapes |
-| `backend/requirements.txt` | **where the Docker blocker lives** |
-| `docker-compose.yml` | 4 services incl. the one-shot `loader` |
-| `docs/SIMULATOR_AUDIT.md` | audit findings and evidence |
-| `docs/OIL_FACT_CHECK.md` | verified vs unverified OIL/eRTMAC claims |
-| `docs/TEAM_STATUS.md` | onboarding brief |
+| `backend/app/api/routes/intelligence.py` | depth-resolved risk, `/api/status.config` |
+| `backend/app/services/risk.py` | risk engine, evidence gathering, alerting |
+| `config/default.yaml` | every threshold, including the new `ui:` section |
+| `backend/alembic/versions/20260907_0000_initial_schema.py` | hypertable + indexes |
+| `ml/anomaly/train.py` | anomaly model + per-row attribution |
 
 ---
 
-## 4. Changes made
+## 4. What changed this session
 
-- **Built the drilling simulator** (`/simulator`). Replays real stored telemetry; no new
-  backend endpoint — it drives the existing replay, risk, analogue, events, formations and
-  engineer-action APIs. Verified live: 6,367 samples replayed, investigation drawer with a
-  real WITSML citation, engineer action persisted as DB row 16.
-- **Audited the simulator end to end** → `docs/SIMULATOR_AUDIT.md`. Confirmed no
-  random/synthetic generator exists anywhere, replay speed changes pacing only, and depth
-  is the stored column.
-- **Fact-checked OIL/eRTMAC** against oil-india.com directly → `docs/OIL_FACT_CHECK.md`.
-- **Fixed: unevaluable risk reported as `INFO` score `0`.** At a depth where nothing can
-  contribute, the engine returned 0.0, which classifies as INFO and reads as "assessed and
-  fine". `RiskResult` now carries `evaluated: bool`; the risk panels render the explicit
-  absence. Added additively (defaults to true) so nothing else breaks.
-- **Fixed: "0 m away" evidence label.** `distance_from_bit_m` is a vertical depth offset,
-  not a distance between wells. Now "same depth" / "N m deeper" / "N m shallower".
-- **Removed GeoAlchemy2**, which broke `create_all` on Postgres with
-  `KeyError: '_saved_columns'`. Nothing else used it.
-- **Declared `pyproj` and `rapidocr-onnxruntime`**, both imported but undeclared.
-- **Moved Docker storage to D:** via a directory junction (see §5).
-- Earlier: report search + passage embeddings, grouped cross-validation, and two extraction
-  fixes (negation, routine operations).
+Fourteen defects found by running the system, not by reading it. The five that would have
+misled a judge:
+
+1. **Risk ignored the depth it was asked about.** Telemetry and the anomaly score were
+   resolved as "most recent row", so the measured half of every assessment was frozen at
+   the end of the recording while the historical half followed the bit. Both now resolve at
+   the queried depth within `risk.telemetry_match_tolerance_m`; past that they are reported
+   unavailable rather than borrowed.
+2. **Routine operations counted as risk evidence.** 184 uncategorised WITSML remarks —
+   toolbox talks, rig moves — produced a MEDIUM indicator "supported by 65 historical
+   records". Only categorised events count now.
+3. **No alert was ever raised.** Nothing called risk with `persist=true`, so the Alerts
+   inbox was empty and engineer actions were impossible. The live session now persists what
+   it evaluates.
+4. **Evidence at exactly the bit's depth scored as the weakest.** `abs(offset or lookahead)`
+   — `0.0` is falsy. An exact depth match returned `historical_evidence: 0.000`; it is
+   0.739 now.
+5. **Institutional memory could not be built from a clean checkout.** `wellbore_document.csv`
+   was required and never downloaded. Now in config and in `download_datasets.py`.
+
+Also fixed: the TimescaleDB hypertable could never be created (primary key omitted the
+partitioning column); mitigation provenance was dropped before reaching the UI; the anomaly
+had no "why" at all; the registry recorded `device: cuda` on a machine with no GPU; event
+citations leaked absolute filesystem paths; the WebSocket claimed to reconnect and did not;
+four backend thresholds were duplicated in the frontend; an actionable 503 looked like a
+hang; the first report search took 14.5 s.
+
+Added, all from data that already existed: the **historical risk radar**, **investigate
+pauses the replay**, **report search inside the investigation drawer**, a **seek control**
+on the replay bar, and **analogue dimension disclosure** in the simulator.
 
 ---
 
 ## 5. Failed attempts — do not repeat
 
-- **`DataFolder` in `settings-store.json` does not move Docker's storage** on the WSL2
-  backend. Docker ignores it and refills C:. `wsl --manage --move` does not help either —
-  the data disk is not a registered distro. **Use a directory junction:**
-  `mklink /J "%LOCALAPPDATA%\Docker\wsl\disk" "D:\DockerData\disk"` with Docker stopped.
-  Already done; `LinkType` reports `Junction`.
-- **Do not let C: approach zero.** A build took it to 2.2 GB and Windows began failing to
-  start processes (`fork: Resource temporarily unavailable`, PowerShell unable to start the
-  CLR). A full build needs ~10 GB.
-- **Bash heredocs mangle regex backslashes.** `\b` became a literal backspace byte inside a
-  compiled regex and silently matched nothing. Write Python source with the Write/Edit
-  tools, and commit messages with `git commit -F <file>`.
-- **`pkill` does not kill the server on Windows.** Use
-  `Get-NetTCPConnection -LocalPort 8000 -State Listen` → `Stop-Process -Force`.
-- **A stale Vite bundle looks exactly like broken features.** "Report search broken" and
-  "Models stuck loading" were both a stale dev server — the API answered in 25 ms. Restart
-  Vite and clear `node_modules/.vite` before debugging the application.
-- **`api.wells` does not exist — it is `api.listWells`.** Cost one silently empty dropdown.
+- **Do not use the interquartile range to scale anomaly feature deviations.** Rolling-slope
+  features are zero for most active rows, so their IQR is ~0 and every non-zero value
+  divides out to hundreds of "sigma" — the same handful of slope features then ranked top
+  for every sample. Standard deviation is inflated by exactly those spikes and ranks what is
+  genuinely unusual: 105 distinct top features across 8,130 scores instead of a handful.
+- **Do not trust a successful XGBoost fit as proof of a GPU.** XGBoost warns and falls back
+  to CPU rather than raising. Read the resolved device from the fitted booster's saved
+  config.
+- **Do not write `abs(x or default)` where `x` can legitimately be 0.0.** It silently turns
+  the best case into the worst.
+- **`create_hypertable` needs the partitioning column in the primary key.** `(id)` alone
+  fails; `(id, recorded_at)` works, PostgreSQL-side only.
 - **Do not select the lithology model on the holdout.** Cross-validation showed the two
-  candidates are not separable (fold spread 3.1× the gap, p = 0.224).
-- **Bit depth 0.0 m early in Volve is genuine**, not a bug — the bit is at surface on a
+  candidates are not separable (fold spread 3.1× the gap, p = 0.224). The disagreement
+  reproduced on this rebuild.
+- **Bit depth 0.0 m early in Volve is genuine** — the bit is at surface on a
   completion/workover run. Do not "fix" it.
+- **A stale Vite bundle looks exactly like broken features.** Restart Vite and clear
+  `node_modules/.vite` before debugging the application.
+- **A stale uvicorn process looks exactly like a fix that did not work.** `--reload` is off
+  in the audit setup; restart it after touching backend code.
+- **`api.wells` does not exist — it is `api.listWells`.**
 
 ---
 
 ## 6. Next steps, in order
 
-1. **Add `pyarrow` to `backend/requirements.txt`.** One line. The loader dies at
-   `load_database.py:137` on `pandas.read_parquet` with
-   `ImportError: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'`.
-   This is the third undeclared dependency of the same class — after adding it, audit all
-   imports against requirements once so the class is closed. Then
-   `docker compose build loader && docker compose up -d` and confirm `/api/status` reports
-   `fallback_active: false`.
-2. **Demo with `NO 15/9-F-9`, not `F-4`.** F-4 stays at 0 m until sample 14,952 of 59,806 —
-   roughly 4 minutes at 600× before depth moves. F-9 has depth from sample 0. Alternatively
-   expose the existing `/api/replay/{id}/seek` endpoint in the simulator UI.
-3. **Pause the replay when Investigate is clicked.** It currently keeps running; the golden
-   demo script says it pauses.
-4. **Move frontend thresholds into config**, served via `/api/status`:
-   `DEPTH_CONTEXT_STEP_M` (Simulator + ActiveWell), `LITHOLOGY_MATCH_TOLERANCE_M`,
-   `PAGE_SIZE`, and the `SPEEDS` list (`replay.min_speed`/`max_speed` already exist in
-   config and are unused by the UI).
-5. Optional: reuse `TelemetryChart` in the simulator for a trend line.
+1. **Ingest more reports, and the deeper pages of those already read.** Coverage is the only
+   thing keeping institutional memory and mitigation strategies at PARTIAL. `--start-page`
+   exists for this, page text is cached under `data/interim/document_text`, and Tesseract is
+   installed, so a second pass is cheap. Target the wells the analogue engine actually
+   returns: `15/9-17`, `15/9-13`, `16/7-5`, `15/9-15`, `16/7-4`.
+2. **Tighten event extraction.** Some categorised "events" are OCR'd table-of-contents lines
+   — *"FISHING —0.00 — 0.00"* is a rig-time summary table, not an incident. They never reach
+   the radar because they carry no depth, but they inflate the event count.
+3. **Run the full `docker compose up --build` end to end**, including the containerised
+   loader and the nginx frontend. The database, migration and complete data load were
+   verified against the container; the backend and frontend images were not rebuilt.
+
+**Best demo depths** (verified, all with real evidence and citations):
+
+| Well | Seek to sample | Bit depth | What appears |
+|---|---|---|---|
+| `NO 15/9-F-7` | 8,167 → resume briefly | ~500 m | `16/7-5` overpull 41 m behind, mitigation *"cemented"*, source *Final Well Report p.30* |
+| `NO 15/9-F-4` | ~43,400 | ~2,375 m | `16/7-5` fishing operation, 7 m from the bit |
+
+`NO 15/9-F-9` starts moving immediately and is the best well for showing the replay itself;
+`NO 15/9-F-4` stays at 0 m until sample 14,952 of 59,806, which is what the seek control is
+for.
 
 **Before any demo:** never claim eRTMAC integration, WITSML use by eRTMAC, or validation on
-Indian wells. See `docs/OIL_FACT_CHECK.md` for what is and is not publicly verified.
+Indian wells. See `docs/OIL_FACT_CHECK.md` — all three OIL source URLs were re-verified on
+2026-09-08 and still contain the quoted text.
 
 ---
 
@@ -140,4 +160,9 @@ uvicorn backend.app.main:app --reload   # terminal 1
 cd frontend && npm run dev              # terminal 2 → http://localhost:5173/simulator
 ```
 
-`GET /api/status` shows what is loaded and which storage backend is actually active.
+For the Postgres stack, `docker compose up -d database`, then set `DATABASE_URL` and run
+the loaders (`data_pipeline.load_database --reset`, `alembic upgrade head`,
+`load_embeddings`, `load_anomaly_scores`, `ml.lithology.predict`, the document ingest).
+
+`GET /api/status` shows what is loaded, which storage backend is active, and every
+threshold the UI renders with.

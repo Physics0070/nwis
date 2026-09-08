@@ -8,6 +8,29 @@ Where something could not be confirmed on an official source it is marked
 
 ---
 
+## Re-verification
+
+Every URL below was fetched again during the final feature audit (2026-09-08) and each
+still returns HTTP 200 and still contains the text quoted from it:
+
+- **Technology and Innovation** — contains, verbatim: *"eRTMAC OIL's Real time data
+  monitoring and analysis center is equipped with state-of-the-art technologies to monitor
+  the various drilling operations in real time with advanced visualization platform and
+  cutting-edge sensor technology. It includes transmission of real time critical well data
+  to the command center."*
+- **Digitalization** — the eRTMAC entry is a modal on the page (`id="ERTMAC"`), titled
+  *"Enhanced - Real Time Monitoring & Control Center for Drilling"*, listing *"Central
+  command center (RTOC) set-up at FHQ"*, *"Sensor & real-time connectivity set up between
+  rig sites and…"* and a visualisation dashboard *"leading to faster anomaly detection, NPT
+  reduction, and enhanced drilling performance"*. Because it is a modal rather than a
+  separate page, cite the Digitalization URL — there is still no standalone eRTMAC page.
+- **Drilling** — returns 200 and mentions eRTMAC.
+
+No claim in the table below changed. Nothing previously marked *Not publicly verified* has
+become verifiable.
+
+---
+
 ## Official sources used
 
 | Page | URL | What it supports |

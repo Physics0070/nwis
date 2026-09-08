@@ -1,10 +1,10 @@
 {
-  "chunks_embedded": 271,
-  "documents_covered": 1,
+  "chunks_embedded": 410,
+  "documents_covered": 8,
   "model": "sentence-transformers/all-MiniLM-L6-v2",
   "dimensions": 384,
   "rebuild": false,
-  "seconds": 27.7,
-  "mean_characters_per_chunk": 745,
+  "seconds": 3.9,
+  "mean_characters_per_chunk": 675,
   "chunks_still_without_embedding": 0
 }

@@ -68,10 +68,15 @@ Sodir docs ─┘    force/volve/       Postgres      lithology       analogue  
 |---|---|
 | Wells | 101 (98 FORCE + 3 Volve), **0 without a real surveyed position** |
 | Telemetry | 86,800 samples, 20 normalised channels |
-| Drilling events | 331 — 184 WITSML, 147 from report text |
-| Mitigations | 48 |
-| Documents | 2 reports, **429 pages OCR'd** @ 0.957 mean confidence |
-| Passages | 562, all embedded (384-d MiniLM) |
+| Drilling events | 243 — 184 WITSML remarks, 59 categorised from report text |
+| Categorised events with a recovered depth | 10 — only these can serve as depth-matched risk evidence |
+| Mitigations | 15, each citing a document and page |
+| Documents | 8 reports, **320 pages OCR'd** |
+| Passages | 410, all embedded (384-d MiniLM) |
+
+These counts are from the 2026-09-08 rebuild recorded in `docs/FINAL_QA_REPORT.md`. Read
+them from `/api/status` and the database before quoting them; they change every time more
+reports are ingested.
 | Formation intervals | 1,482 |
 | Lithology predictions | 18,842 |
 | Anomaly scores | 8,130 |
@@ -135,7 +140,7 @@ machine): **0 server errors**. Chromium: 0 console errors.
    is basin-agnostic; the lithology model is not.
 5. No authentication, TLS or rate limiting. Prototype.
 6. 2 of 388 reports ingested.
-7. 0 of 48 mitigations carry a parsed `outcome` — the outcome vocabulary does not match
+7. Most mitigations carry no parsed `outcome` — the outcome vocabulary does not match
    this corpus. The PROBLEM → ACTION → SOURCE chain is real; OUTCOME is usually missing.
 
 ---

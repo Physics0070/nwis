@@ -22,13 +22,16 @@ rather than showing a zero.
 |---|---|
 | Wells in knowledge base | **101** (98 FORCE + 3 Volve), 0 without a real surveyed position |
 | Telemetry | **86,800** samples at 10 s cadence, 20 normalised channels |
-| Historical events | **184**, every one with a depth recovered from telemetry |
+| Historical events | **184** WITSML remarks with depths recovered from telemetry, plus categorised events extracted from reports |
 | Segment embeddings | **3,620** across 98 wells, 32 interpretable dimensions |
 | Lithology model | trained on 1,170,511 rows; evaluated on **10 wells it has never seen** |
 | Anomaly model | trained on 8,130 operationally-active rows, 121 features |
 | Lithology predictions | **18,842** stored, 0.80 agreement with labels |
-| Documents ingested | 60 scanned pages OCR'd, 33 formation intervals recovered |
-| Tests | **46 backend + 14 frontend passing** |
+| Documents ingested | 8 reports, 320 scanned pages OCR'd, 410 passages all embedded |
+| Tests | **86 backend + 30 frontend passing** |
+
+Counts move as more reports are ingested. `GET /api/status` is the authority; the figures
+above are from the rebuild recorded in [`docs/FINAL_QA_REPORT.md`](docs/FINAL_QA_REPORT.md).
 
 Model metrics are in [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md). They are what the models
 scored, including where they scored badly.
@@ -178,8 +181,8 @@ environment and by `NWIS__SECTION__KEY` environment variables.
 ## Tests
 
 ```bash
-python -m pytest backend/tests -q      # 46 tests
-cd frontend && npm run test            # 14 tests
+python -m pytest backend/tests -q      # 86 tests
+cd frontend && npm run test            # 30 tests
 ```
 
 Covers the honesty contracts (no invented probability, no invented position, no silently

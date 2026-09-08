@@ -1,24 +1,52 @@
 [
   {
-    "document_id": 1,
-    "well": "15/9-17",
-    "title": "60_15_9_17_Completion_report_and_log",
-    "pages_processed": 202,
-    "pages_with_text": 201,
-    "characters": 191406,
+    "document_id": 7,
+    "well": "16/7-4",
+    "title": "91_01_16_7_4_Final_Well_Report",
+    "pages_processed": 40,
+    "pages_with_text": 40,
+    "characters": 21984,
     "methods": {
-      "rapidocr": 202
+      "tesseract": 40
     },
-    "mean_confidence": 0.9569,
-    "min_confidence": 0.5995,
-    "extended_existing_document": true,
-    "start_page": 30,
-    "pages_stored_before": 30,
-    "chunks": 271,
-    "events_stored": 86,
-    "mitigations_stored": 30,
+    "mean_confidence": 0.7503,
+    "min_confidence": 0.3233,
+    "extended_existing_document": false,
+    "start_page": 0,
+    "pages_stored_before": 0,
+    "chunks": 44,
+    "events_stored": 16,
+    "mitigations_stored": 0,
     "formation_intervals_found": 0,
     "formation_intervals_stored": 0,
-    "records_found": 113
+    "records_found": 28,
+    "mentions_excluded": 0,
+    "exclusion_reasons": {}
+  },
+  {
+    "document_id": 8,
+    "well": "16/7-4",
+    "title": "91_02_16_7_4_End_of_well_Report_Gearhart_Geodata_Services",
+    "pages_processed": 40,
+    "pages_with_text": 40,
+    "characters": 33721,
+    "methods": {
+      "tesseract": 40
+    },
+    "mean_confidence": 0.6886,
+    "min_confidence": 0.2979,
+    "extended_existing_document": false,
+    "start_page": 0,
+    "pages_stored_before": 0,
+    "chunks": 56,
+    "events_stored": 23,
+    "mitigations_stored": 10,
+    "formation_intervals_found": 0,
+    "formation_intervals_stored": 0,
+    "records_found": 32,
+    "mentions_excluded": 3,
+    "exclusion_reasons": {
+      "routine:leak off": 3
+    }
   }
 ]

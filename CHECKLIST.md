@@ -64,7 +64,10 @@ Last updated: 2026-09-07
 ## Phase 7 — Anomaly detection
 
 - [x] Isolation Forest trained (121 features, 8,130 active rows, 1.05 s)
-- [x] Contributing-feature attribution wired into risk payload
+- [x] Contributing-feature attribution wired into risk payload — computed per row at
+      scoring time as a deviation score against the active-row median (not an
+      Isolation Forest attribution; the forest exposes none) and shown in the UI.
+      Previously the field was written as an empty list for every score.
 - [x] Persisted anomaly results (8,130 scores in DB; risk engine resolves them automatically)
 
 ## Phase 8 — Contextual analogue engine

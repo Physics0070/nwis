@@ -30,6 +30,49 @@ Scroll to **System notes**. The interface volunteers its own limitations.
 
 ---
 
+## 1b · The simulator — the whole loop in one screen (3 min)
+
+Open **Simulator** and select **NO 15/9-F-4**. Press **Start**, then drag the position
+scrubber to roughly sample **43,400 of 59,806**. The recording sits near the surface for
+its first quarter, and the scrubber is there so a demo does not have to wait it out.
+
+The bit lands at about **2,375 m**. Read the intelligence panel top to bottom — it is the
+entire product in one column:
+
+> A LOW indicator, and no probability, because there are no labelled incidents to calibrate
+> one against.
+>
+> Three components, each with its own sentence. The anomaly score comes from an Isolation
+> Forest, and underneath it the readings that were furthest from normal for this sample.
+> The rules component names the channel and the limit it crossed.
+>
+> The **historical risk radar** places the bit on the engine's own 150 m look-ahead window
+> and puts each historical record at its real depth offset. Here it reports a **fishing
+> operation recorded in 16/7-5, 7 m behind the bit** — a well 15 km away, retrieved
+> because of where it sits in the hole, not because it is near.
+
+Click **Investigate**. The replay pauses — the evidence was retrieved for one depth, and
+letting the bit run on behind the drawer would leave you reading about a depth the well has
+already passed.
+
+The drawer is the reasoning chain: analogue well and its similarity, what happened there,
+what was done about it, what came of it, and the page of the report it came from. Press
+**Search reports** to pull passages about this event out of the scanned corpus, each with
+its page citation. Record a decision at the bottom; the confirmation names the alert it was
+filed against. Close the drawer and the replay resumes.
+
+Worth saying plainly:
+
+> Every one of those numbers is a stored measurement or a retrieved record. The only thing
+> the simulator invents is the passage of time.
+
+**A note on what the panel will sometimes say.** At many depths it reports that risk could
+not be evaluated, or that no telemetry lies within 25 m of the queried depth. That is the
+system refusing to describe a depth it has no measurement for, rather than borrowing a
+reading from elsewhere in the hole. Show it — it is the point.
+
+---
+
 ## 2 · Active well — live telemetry from real recordings (2 min)
 
 Open **Wells → NO 15/9-F-4**.
@@ -158,8 +201,10 @@ Now type something the corpus does not contain — `orbital mechanics`:
 Worth stating if asked how the corpus was built:
 
 > The first 30 pages of these reports are geological sample descriptions. The drilling
-> narrative is deeper in, so we read all 429 pages. That took the mitigation count from
-> **0 to 48** — real recorded actions, each traceable to a page.
+> narrative is deeper in, which is where the recorded actions live — real actions, each
+> traceable to a page. Check the live counts before the demo rather than quoting a figure
+> from this document; the search panel prints how many of the stored passages are indexed
+> on every query.
 >
 > It also exposed two extraction bugs worth admitting: "No tight spot" was being stored as
 > a tight-hole *event*, and a leak-off test — a planned integrity test — was being recorded
@@ -191,17 +236,36 @@ Scroll to the per-class table and point at the zeros:
 ## Questions you should expect
 
 **"Is this just a distance ranking?"**
-No. Demonstrate `16/10-1` at 36 km outranking nearer wells on geology 0.9873.
+No. Open a FORCE well with logs — `16/2-16` at 1,100 m ranks `31/2-9`, **231 km away**,
+fourth, on geology 0.801 and a shared formation, with a geography component of **exactly
+zero**.
+
+Be straight about the other side of this: on the Volve replay wells the ranking *cannot* be
+contextual, because those wellbores have no wireline logs and no stratigraphy. The
+simulator prints which dimensions actually contributed and which were unavailable, so the
+degradation is visible rather than hidden. What still moves with depth on those wells is
+the historical evidence and the radar, which is the correlation the simulator is about.
+
+**"Are those 'historical events' actually risks?"**
+Only categorised ones count. The Volve WITSML stream is an operations log — most of its
+records are remarks like "Toolbox Talk Prior to Rig Up Tubing Equipment". Counting those
+would manufacture a risk signal out of routine housekeeping, so the engine ignores
+uncategorised remarks. They stay visible on the borehole track as recorded events; they do
+not raise an indicator.
 
 **"What's your accuracy?"**
-0.7498 on ten unseen wells against a 0.6139 majority baseline — but accuracy is the wrong
-headline on a dataset that is 61% shale. Macro F1 is 0.3852 against a 0.0761 baseline, and
-the per-class table shows exactly where it fails.
+Read the figure off the **Models** page rather than from this document — it is written by
+the training run, and it moves when the model is retrained. At the time of the last audit:
+**0.7523 accuracy on the ten unseen FORCE holdout wells**, macro F1 **0.3848**. Accuracy is
+the wrong headline on a dataset that is 61% shale, which is why the majority baseline is
+shown beside it and the per-class table shows exactly where the model fails.
 
 **"Which model did you pick, and why?"**
 RandomForest, on validation wells only — a rule fixed before we looked. XGBoost scores
 better on the external holdout, but selecting on the holdout *is* selecting on the test
-set, so we did not. We then ran grouped cross-validation over 83 wells to settle it:
+set, so we did not. The registry records the disagreement rather than hiding it, and it
+reproduced on the audit rebuild: RandomForest 0.3847 validation macro F1 against XGBoost
+0.3335, with XGBoost ahead on the holdout at 0.3848 to 0.3345. We then ran grouped cross-validation over 83 wells to settle it:
 XGBoost 0.3840 ± 0.0543, RandomForest 0.3667 ± 0.0462, p = 0.224.
 
 The honest finding is that **the two models are not separable** — the spread between folds
