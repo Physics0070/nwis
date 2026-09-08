@@ -305,6 +305,21 @@ export interface DocumentSearchResponse {
   };
 }
 
+/**
+ * Thresholds, windows and step sizes the UI renders with, served from the backend's own
+ * configuration. They live there rather than in the frontend so the picture the engineer
+ * sees can never disagree with the query that produced it.
+ */
+export interface UiConfig {
+  depth_context_step_m: number;
+  lithology_match_tolerance_m: number;
+  page_size: number;
+  replay_speeds: number[];
+  risk_lookahead_m: number;
+  replay_min_speed: number;
+  replay_max_speed: number;
+}
+
 export interface SystemStatus {
   application: string;
   environment: string;
@@ -312,6 +327,7 @@ export interface SystemStatus {
   counts: Record<string, number>;
   models: Array<Record<string, any>>;
   warnings: string[];
+  config: UiConfig;
 }
 
 // ---------------------------------------------------------------------- endpoints
@@ -371,10 +387,24 @@ export const api = {
       `/api/wells/${id}/telemetry?limit=${limit}&offset=${offset}&active_only=${activeOnly}`,
     ),
 
-  risk: (id: number, depthM?: number | null, anomalyScore?: number | null) => {
+  /**
+   * Evaluate risk at a depth.
+   *
+   * `persist` stores the assessment and lets the engine raise an alert if its own
+   * thresholds, cooldown and depth deduplication allow one. The live session uses it so
+   * that the alert an engineer acts on is the assessment they were actually shown;
+   * read-only browsing of historical wells does not.
+   */
+  risk: (
+    id: number,
+    depthM?: number | null,
+    anomalyScore?: number | null,
+    options?: { persist?: boolean },
+  ) => {
     const query = new URLSearchParams();
     if (depthM != null) query.set("depth_m", String(depthM));
     if (anomalyScore != null) query.set("anomaly_score", String(anomalyScore));
+    if (options?.persist) query.set("persist", "true");
     return request<RiskAssessment>(`/api/wells/${id}/risk?${query}`);
   },
 
@@ -420,6 +450,8 @@ export const api = {
     request<ReplayState>(`/api/replay/${id}/resume`, { method: "POST" }),
   replayStop: (id: number) =>
     request<ReplayState>(`/api/replay/${id}/stop`, { method: "POST" }),
+  replaySeek: (id: number, index: number) =>
+    request<ReplayState>(`/api/replay/${id}/seek?index=${index}`, { method: "POST" }),
   replaySpeed: (id: number, speed: number) =>
     request<ReplayState>(`/api/replay/${id}/speed?speed=${speed}`, {
       method: "POST",

@@ -8,7 +8,7 @@
  * beside live data.
  */
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useTelemetryStream } from "./useTelemetryStream";
 
 class FakeSocket {
@@ -77,5 +77,48 @@ describe("useTelemetryStream", () => {
 
     act(() => live.onclose?.());
     expect(result.current.connection).toBe("closed");
+  });
+});
+
+describe("reconnect", () => {
+  // The simulator tells the engineer the stream retries on its own. It has to be true:
+  // a dropped socket during a demo would otherwise freeze the page on its last sample
+  // with no way back other than a reload.
+  it("opens a new socket after the live one drops", () => {
+    vi.useFakeTimers();
+    try {
+      renderHook(() => useTelemetryStream(1));
+      const live = FakeSocket.instances[0];
+      act(() => live.onopen?.());
+      expect(FakeSocket.instances).toHaveLength(1);
+
+      act(() => live.onclose?.());
+      // Nothing yet — the retry is deliberately delayed rather than hammering a server
+      // that may be restarting.
+      expect(FakeSocket.instances).toHaveLength(1);
+
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(FakeSocket.instances.length).toBeGreaterThan(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not retry a socket that was torn down deliberately", () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderHook(() => useTelemetryStream(1));
+      const live = FakeSocket.instances[0];
+      act(() => live.onopen?.());
+      unmount();
+      act(() => {
+        vi.advanceTimersByTime(30000);
+      });
+      expect(FakeSocket.instances).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

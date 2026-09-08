@@ -71,6 +71,12 @@ export default function Reports() {
     queryKey: ["document-search", query],
     queryFn: () => api.searchDocuments(query),
     enabled: query.trim().length >= 2,
+    // A 503 here is an answer, not a blip: it carries the reason the corpus cannot be
+    // searched and the command that fixes it. Retrying it three times behind a backoff
+    // left the page saying "Searching report passages…" for seven seconds and then
+    // showing the same message anyway. Surface it at once; the error state has its own
+    // retry button.
+    retry: false,
   });
 
   const provenance = search.data?.provenance;

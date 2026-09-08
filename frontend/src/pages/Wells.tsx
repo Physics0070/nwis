@@ -7,15 +7,21 @@ import {
   ErrorState, Loading, Panel, Tag, Unavailable, formatDepth, formatNumber,
 } from "../components/primitives";
 
-const PAGE_SIZE = 25;
 
 export default function Wells() {
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
 
+  // Page size is the backend's `ui.page_size`, so the pager arithmetic here and the
+  // limit the API applies can never disagree.
+  const status = useQuery({ queryKey: ["status"], queryFn: api.status });
+  const pageSize = status.data?.config.page_size ?? null;
+
   const wells = useQuery({
-    queryKey: ["wells", search, offset],
-    queryFn: () => api.listWells({ search: search || undefined, limit: PAGE_SIZE, offset }),
+    queryKey: ["wells", search, offset, pageSize],
+    queryFn: () =>
+      api.listWells({ search: search || undefined, limit: pageSize as number, offset }),
+    enabled: pageSize != null,
   });
 
   return (
@@ -83,18 +89,18 @@ export default function Wells() {
             <button
               type="button"
               disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+              onClick={() => setOffset(Math.max(0, offset - (pageSize ?? 0)))}
               className="rounded-pill border border-surface-border px-3 py-1 text-ink-secondary disabled:opacity-40"
             >
               Previous
             </button>
             <span className="text-ink-muted">
-              {offset + 1}–{Math.min(offset + PAGE_SIZE, wells.data.total)} of {wells.data.total}
+              {offset + 1}–{Math.min(offset + (pageSize ?? 0), wells.data.total)} of {wells.data.total}
             </span>
             <button
               type="button"
-              disabled={offset + PAGE_SIZE >= wells.data.total}
-              onClick={() => setOffset(offset + PAGE_SIZE)}
+              disabled={offset + (pageSize ?? 0) >= wells.data.total}
+              onClick={() => setOffset(offset + (pageSize ?? 0))}
               className="rounded-pill border border-surface-border px-3 py-1 text-ink-secondary disabled:opacity-40"
             >
               Next

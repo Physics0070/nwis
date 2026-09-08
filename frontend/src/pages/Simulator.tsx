@@ -9,6 +9,10 @@
  * Layout is deliberately flat — top bar, borehole, a short telemetry strip, one
  * intelligence panel, controls. Secondary detail lives in the investigation drawer
  * rather than in more cards.
+ *
+ * Every threshold and window used for rendering comes from `/api/status`, not from a
+ * constant in this file: the depth quantisation step, the offered replay speeds and the
+ * risk engine's look-ahead window are all the backend's own configured values.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -16,10 +20,12 @@ import {
   api,
   type DrillingEvent,
   type HistoricalEvidence,
+  type UiConfig,
   type Well,
 } from "../lib/api";
 import { useTelemetryStream } from "../hooks/useTelemetryStream";
 import DrillTrack from "../components/DrillTrack";
+import DepthRadar, { relationToBit } from "../components/DepthRadar";
 import {
   ErrorState,
   LevelBadge,
@@ -41,23 +47,23 @@ const PRIMARY_CHANNELS: Array<{ key: string; label: string; unit: string }> = [
   { key: "rop_m_per_hr", label: "ROP", unit: "m/hr" },
 ];
 
-/** The bit must move this far before geological context is re-queried. */
-const DEPTH_CONTEXT_STEP_M = 25;
-
 /**
  * Snap the bit depth to the context grid, or keep the previous value.
  *
- * Exported only so it can be tested: re-querying risk and analogues on every 10-second
- * sample leaves both panels permanently loading, which is worse than stale context.
+ * `stepM` is the backend's `ui.depth_context_step_m`. Exported so it can be tested:
+ * re-querying risk and analogues on every 10-second sample leaves both panels
+ * permanently loading, which is worse than slightly stale context.
  */
-export function nextContextDepth(previous: number | null, bitDepth: number): number {
-  if (previous != null && Math.abs(bitDepth - previous) < DEPTH_CONTEXT_STEP_M) {
+export function nextContextDepth(
+  previous: number | null,
+  bitDepth: number,
+  stepM: number,
+): number {
+  if (previous != null && Math.abs(bitDepth - previous) < stepM) {
     return previous;
   }
-  return Math.round(bitDepth / DEPTH_CONTEXT_STEP_M) * DEPTH_CONTEXT_STEP_M;
+  return Math.round(bitDepth / stepM) * stepM;
 }
-
-const SPEEDS = [60, 300, 600, 1800, 3600];
 
 /**
  * Describe where a historical event sits relative to the bit, in DEPTH.
@@ -96,13 +102,23 @@ function Value({
 
 export default function Simulator() {
   const [wellId, setWellId] = useState<number | null>(null);
-  const [speed, setSpeed] = useState(600);
+  const [speed, setSpeed] = useState<number | null>(null);
   const [investigating, setInvestigating] = useState<HistoricalEvidence | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<DrillingEvent | null>(null);
   const [actionNote, setActionNote] = useState("");
   const [engineer, setEngineer] = useState("");
   const [actionSaved, setActionSaved] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [seekDraft, setSeekDraft] = useState<number | null>(null);
+  // Whether *this drawer* is what paused the replay, so closing it restores what the
+  // engineer interrupted instead of resuming a replay they paused deliberately. State
+  // rather than a ref because the drawer renders it.
+  const [pausedByInvestigation, setPausedByInvestigation] = useState(false);
+
+  // Thresholds and windows are the backend's, fetched once. Panels that need them wait
+  // rather than falling back to a number invented here.
+  const status = useQuery({ queryKey: ["status"], queryFn: api.status });
+  const config: UiConfig | undefined = status.data?.config;
 
   // Only wells that actually have recorded telemetry can be replayed.
   const wells = useQuery({
@@ -118,14 +134,20 @@ export default function Simulator() {
   // Quantised so the intelligence panel does not refetch on every 10-second sample.
   const [contextDepth, setContextDepth] = useState<number | null>(null);
   useEffect(() => {
-    if (bitDepth == null) return;
-    setContextDepth((previous) => nextContextDepth(previous, bitDepth));
-  }, [bitDepth]);
+    if (bitDepth == null || config == null) return;
+    setContextDepth((previous) =>
+      nextContextDepth(previous, bitDepth, config.depth_context_step_m),
+    );
+  }, [bitDepth, config]);
 
   const enabled = wellId != null;
+  // The live session persists what it evaluates. Without this the engine never records
+  // an assessment and never raises an alert, so the alert inbox stays empty and an
+  // engineer has nothing to attach a decision to. Cooldown and depth deduplication in
+  // the risk engine are what stop this becoming alert spam.
   const risk = useQuery({
     queryKey: ["sim-risk", wellId, contextDepth],
-    queryFn: () => api.risk(wellId as number, contextDepth),
+    queryFn: () => api.risk(wellId as number, contextDepth, null, { persist: true }),
     enabled: enabled && contextDepth != null,
   });
   const analogues = useQuery({
@@ -147,10 +169,11 @@ export default function Simulator() {
   const controls = useMemo(() => {
     if (wellId == null) return null;
     return {
-      start: () => api.replayStart(wellId, speed).then(setReplayState),
+      start: () => api.replayStart(wellId, speed ?? undefined).then(setReplayState),
       pause: () => api.replayPause(wellId).then(setReplayState),
       resume: () => api.replayResume(wellId).then(setReplayState),
       stop: () => api.replayStop(wellId).then(setReplayState),
+      seek: (index: number) => api.replaySeek(wellId, index).then(setReplayState),
     };
   }, [wellId, speed, setReplayState]);
 
@@ -162,14 +185,42 @@ export default function Simulator() {
     [wellId, setReplayState],
   );
 
-  const status = replayState?.status ?? "stopped";
-  const finished = status === "finished";
+  const status_ = replayState?.status ?? "stopped";
+  const finished = status_ === "finished";
   const progress =
     replayState && replayState.total_samples > 0
       ? replayState.current_index / replayState.total_samples
       : 0;
 
   const selectedWell: Well | undefined = wells.data?.items.find((w) => w.id === wellId);
+  const speeds = config?.replay_speeds ?? [];
+  const activeSpeed = speed ?? replayState?.speed ?? null;
+
+  /**
+   * Open the investigation and hold the replay where it is.
+   *
+   * The evidence in the drawer was retrieved for one depth. Letting the bit keep moving
+   * behind it would leave the engineer reading an explanation of a depth the well has
+   * already passed.
+   */
+  const investigate = useCallback(
+    async (item: HistoricalEvidence) => {
+      setInvestigating(item);
+      if (status_ === "running") {
+        setPausedByInvestigation(true);
+        await controls?.pause().catch(() => undefined);
+      }
+    },
+    [controls, status_],
+  );
+
+  const closeInvestigation = useCallback(async () => {
+    setInvestigating(null);
+    if (pausedByInvestigation) {
+      setPausedByInvestigation(false);
+      await controls?.resume().catch(() => undefined);
+    }
+  }, [controls, pausedByInvestigation]);
 
   async function recordAction(decision: string) {
     if (wellId == null) return;
@@ -184,14 +235,19 @@ export default function Simulator() {
         );
         return;
       }
+      const alert = alerts[0];
       await api.recordAction({
-        alert_id: alerts[0].id,
+        alert_id: alert.id,
         decision,
         action_description: actionNote || undefined,
         engineer_name: engineer || undefined,
       });
+      // Name the alert the decision was filed against. It is the well's most recent one,
+      // which is not necessarily the depth on screen, and an engineer should be able to
+      // see which record they just wrote to rather than assume.
       setActionSaved(
-        `Recorded as "${decision}". Stored for future training; nothing retrains automatically.`,
+        `Recorded as "${decision}" against alert #${alert.id} (${alert.title}). ` +
+          "Stored for future training; nothing retrains automatically.",
       );
       setActionNote("");
     } catch (error) {
@@ -215,6 +271,8 @@ export default function Simulator() {
             setContextDepth(null);
             setInvestigating(null);
             setActionSaved(null);
+            setSeekDraft(null);
+            setPausedByInvestigation(false);
           }}
           aria-label="Select well"
           className="rounded-pill border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-ink-primary focus:border-accent focus:outline-none"
@@ -229,7 +287,8 @@ export default function Simulator() {
 
         {selectedWell && (
           <span className="text-[11px] text-ink-muted">
-            {replayState?.source ?? "recorded telemetry"}
+            {replayState?.source ?? "recorded telemetry"} · historical Volve telemetry, not
+            a live rig feed
           </span>
         )}
 
@@ -250,19 +309,20 @@ export default function Simulator() {
             </span>
           </span>
           <span className="rounded-pill bg-surface-overlay px-2 py-0.5 text-ink-secondary">
-            {status}
+            {status_}
           </span>
         </div>
       </div>
 
       {lastError && connection !== "open" && (
         <div className="rounded-card border border-state-warn/40 bg-state-warn/10 px-3 py-2 text-xs text-ink-secondary">
-          {lastError} — the stream will reconnect automatically; nothing below is estimated
-          while it is down.
+          {lastError} — the stream retries automatically; nothing below is estimated while
+          it is down.
         </div>
       )}
 
       {wells.isError && <ErrorState error={wells.error} onRetry={() => wells.refetch()} />}
+      {status.isError && <ErrorState error={status.error} onRetry={() => status.refetch()} />}
 
       {wellId == null ? (
         <Panel>
@@ -334,17 +394,60 @@ export default function Simulator() {
 
                   <div className="space-y-1">
                     {risk.data.components.map((c) => (
-                      <div key={c.name} className="flex items-center justify-between text-xs">
-                        <span className="text-ink-secondary">{c.name.replace(/_/g, " ")}</span>
-                        {c.available ? (
-                          <span className="font-mono text-ink-primary">
-                            {formatNumber(c.value, 3)}
+                      <div key={c.name} className="text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-ink-secondary">
+                            {c.name.replace(/_/g, " ")}
                           </span>
-                        ) : (
-                          <span className="text-[11px] text-ink-muted">No data available</span>
-                        )}
+                          {c.available ? (
+                            <span className="font-mono text-ink-primary">
+                              {formatNumber(c.value, 3)}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-ink-muted">
+                              No data available
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-ink-muted">{c.explanation}</p>
                       </div>
                     ))}
+                  </div>
+
+                  {/*
+                    Which measurements pushed this sample away from normal. Stored by the
+                    Isolation Forest at scoring time — the model reports abnormal
+                    behaviour and the features behind it, and never names a failure mode.
+                  */}
+                  {risk.data.contributing_features.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-[11px] uppercase tracking-wider text-ink-muted">
+                        What made this sample unusual
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {risk.data.contributing_features.slice(0, 5).map((f, i) => (
+                          <Tag key={i}>
+                            {String(f.feature ?? f.name ?? "feature")}
+                            {typeof f.contribution === "number"
+                              ? ` ${formatNumber(f.contribution as number, 2)}`
+                              : ""}
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ---------------------------------- historical risk radar */}
+                  <div>
+                    <p className="mb-1 text-[11px] uppercase tracking-wider text-ink-muted">
+                      Historical risk radar
+                    </p>
+                    <DepthRadar
+                      bitDepthM={risk.data.depth_m}
+                      lookaheadM={config?.risk_lookahead_m ?? null}
+                      evidence={risk.data.historical_evidence}
+                      onSelect={investigate}
+                    />
                   </div>
 
                   {/* historical evidence → investigation */}
@@ -360,10 +463,11 @@ export default function Simulator() {
                           <button
                             key={e.event_id}
                             type="button"
-                            onClick={() => setInvestigating(e)}
+                            onClick={() => investigate(e)}
                             className="flex w-full items-center gap-2 rounded-card border border-surface-border bg-surface-overlay px-3 py-2 text-left text-xs hover:bg-surface-hover"
                           >
                             <span className="text-ink-primary">{e.well_name}</span>
+                            <span className="text-ink-muted">{e.event_type}</span>
                             {e.distance_from_bit_m != null && (
                               <Tag>{depthRelationToBit(e.distance_from_bit_m)}</Tag>
                             )}
@@ -376,11 +480,34 @@ export default function Simulator() {
                     )}
                   </div>
 
+                  {/*
+                    Which similarity dimensions actually contributed. This matters more
+                    on the replay wells than anywhere else: the Volve wellbores carry
+                    telemetry but no wireline logs and no stratigraphy, so geology and
+                    formation genuinely cannot be computed against a FORCE candidate and
+                    the ranking falls back on the dimensions that can. Saying so is the
+                    difference between honest degradation and a score that looks more
+                    contextual than it is.
+                  */}
                   {analogues.data && analogues.data.matches.length > 0 && (
-                    <p className="text-[11px] text-ink-muted">
-                      Top analogue: {analogues.data.matches[0].well.name} (score{" "}
-                      {formatNumber(analogues.data.matches[0].score, 3)})
-                    </p>
+                    <div className="text-[11px] text-ink-muted">
+                      <p>
+                        Top analogue: {analogues.data.matches[0].well.name} (score{" "}
+                        {formatNumber(analogues.data.matches[0].score, 3)})
+                      </p>
+                      <p>
+                        scored on {analogues.data.matches[0].dimensions_used.join(", ")}
+                        {analogues.data.matches[0].dimensions_unavailable.length > 0 && (
+                          <>
+                            {" · "}
+                            <span className="text-state-warn">
+                              not available:{" "}
+                              {analogues.data.matches[0].dimensions_unavailable.join(", ")}
+                            </span>
+                          </>
+                        )}
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -410,10 +537,10 @@ export default function Simulator() {
             <div className="flex flex-wrap items-center gap-2">
               {(
                 [
-                  ["Start", () => controls?.start(), status === "running"],
-                  ["Pause", () => controls?.pause(), status !== "running"],
-                  ["Resume", () => controls?.resume(), status !== "paused"],
-                  ["Stop", () => controls?.stop(), status === "stopped"],
+                  ["Start", () => controls?.start(), status_ === "running"],
+                  ["Pause", () => controls?.pause(), status_ !== "running"],
+                  ["Resume", () => controls?.resume(), status_ !== "paused"],
+                  ["Stop", () => controls?.stop(), status_ === "stopped"],
                 ] as Array<[string, () => void, boolean]>
               ).map(([label, onClick, disabled]) => (
                 <button
@@ -433,6 +560,8 @@ export default function Simulator() {
                   setContextDepth(null);
                   setInvestigating(null);
                   setActionSaved(null);
+                  setSeekDraft(null);
+                  setPausedByInvestigation(false);
                   await controls?.start();
                 }}
                 className="rounded-pill border border-surface-border px-4 py-1.5 text-xs text-ink-secondary hover:bg-surface-hover"
@@ -442,33 +571,57 @@ export default function Simulator() {
 
               <div className="ml-auto flex items-center gap-2">
                 <span className="text-[11px] text-ink-muted">speed</span>
-                {SPEEDS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => changeSpeed(s)}
-                    className={`rounded-pill px-2.5 py-1 text-[11px] ${
-                      speed === s
-                        ? "bg-accent-soft text-accent-strong"
-                        : "text-ink-muted hover:bg-surface-hover"
-                    }`}
-                  >
-                    {s}×
-                  </button>
-                ))}
+                {speeds.length === 0 ? (
+                  <span className="text-[11px] text-ink-muted">No data available</span>
+                ) : (
+                  speeds.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => changeSpeed(s)}
+                      className={`rounded-pill px-2.5 py-1 text-[11px] ${
+                        activeSpeed === s
+                          ? "bg-accent-soft text-accent-strong"
+                          : "text-ink-muted hover:bg-surface-hover"
+                      }`}
+                    >
+                      {s}×
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
-            {replayState && (
+            {replayState && replayState.total_samples > 0 && (
               <div className="mt-3">
-                <div className="h-1 w-full overflow-hidden rounded-pill bg-surface-overlay">
-                  <div
-                    className="h-full bg-accent"
-                    style={{ width: `${progress * 100}%`, transition: "width 700ms linear" }}
-                  />
-                </div>
+                {/*
+                  Scrub position. Some recordings sit at the surface for a long stretch
+                  before the bit moves — F-4 does not leave 0 m until sample 14,952 of
+                  59,806 — so a demo needs to be able to move to where the interesting
+                  interval is rather than waiting the recording out.
+                */}
+                <input
+                  type="range"
+                  min={0}
+                  max={replayState.total_samples - 1}
+                  value={seekDraft ?? replayState.current_index}
+                  aria-label="Replay position"
+                  onChange={(event) => setSeekDraft(Number(event.target.value))}
+                  onMouseUp={() => {
+                    if (seekDraft != null) controls?.seek(seekDraft);
+                    setSeekDraft(null);
+                  }}
+                  onTouchEnd={() => {
+                    if (seekDraft != null) controls?.seek(seekDraft);
+                    setSeekDraft(null);
+                  }}
+                  className="h-1 w-full cursor-pointer appearance-none rounded-pill bg-surface-overlay accent-accent"
+                  style={{
+                    background: `linear-gradient(to right, #2f9dd6 ${progress * 100}%, #1b2733 ${progress * 100}%)`,
+                  }}
+                />
                 <p className="mt-1 font-mono text-[11px] text-ink-muted">
-                  {replayState.current_index.toLocaleString()} /{" "}
+                  {(seekDraft ?? replayState.current_index).toLocaleString()} /{" "}
                   {replayState.total_samples.toLocaleString()} samples ·{" "}
                   {formatTimestamp(replayState.current_timestamp)}
                 </p>
@@ -506,125 +659,18 @@ export default function Simulator() {
 
       {/* ---------------------------------------------------- investigation drawer */}
       {investigating && (
-        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-surface-border bg-surface-raised p-4 shadow-card">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-ink-primary">Investigation</h2>
-              <p className="text-[11px] text-ink-muted">
-                Evidence retrieved from the database, not generated
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setInvestigating(null)}
-              aria-label="Close investigation"
-              className="rounded-pill border border-surface-border px-3 py-1 text-xs text-ink-secondary hover:bg-surface-hover"
-            >
-              Close
-            </button>
-          </div>
-
-          <div className="mt-4 space-y-4 text-xs">
-            <section>
-              <p className="text-[10px] uppercase tracking-wider text-ink-muted">Analogue well</p>
-              <p className="text-ink-primary">{investigating.well_name}</p>
-              <p className="text-ink-muted">
-                similarity {formatNumber(investigating.similarity_score, 4)}
-              </p>
-            </section>
-
-            <section>
-              <p className="text-[10px] uppercase tracking-wider text-ink-muted">
-                What happened there
-              </p>
-              <p className="text-ink-secondary">{investigating.description}</p>
-              <div className="mt-1 flex flex-wrap gap-1">
-                <Tag>{investigating.event_type}</Tag>
-                {investigating.formation_name && <Tag>{investigating.formation_name}</Tag>}
-                {investigating.depth_start_m != null && (
-                  <Tag>{formatNumber(investigating.depth_start_m, 0)} m</Tag>
-                )}
-              </div>
-            </section>
-
-            <section>
-              <p className="text-[10px] uppercase tracking-wider text-ink-muted">
-                What was done about it
-              </p>
-              {investigating.mitigations.length === 0 ? (
-                <p className="text-ink-muted">
-                  No validated historical mitigation found for this event. NWIS retrieves
-                  actions that were recorded; it does not generate one.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {investigating.mitigations.map((m, i) => (
-                    <li key={i} className="rounded-card border border-surface-border bg-surface-overlay p-2">
-                      <p className="text-ink-primary">{String(m.action_taken ?? "—")}</p>
-                      {m.outcome ? (
-                        <p className="mt-0.5 text-ink-muted">outcome: {String(m.outcome)}</p>
-                      ) : (
-                        <p className="mt-0.5 text-ink-muted">outcome: No data available</p>
-                      )}
-                      {m.source_reference != null && (
-                        <p className="mt-0.5 text-[10px] text-ink-muted">
-                          source: {String(m.source_reference)}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section>
-              <p className="text-[10px] uppercase tracking-wider text-ink-muted">Provenance</p>
-              <p className="text-ink-muted">
-                {investigating.source_dataset ?? "No data available"}
-                {investigating.source_reference ? ` · ${investigating.source_reference}` : ""}
-              </p>
-              {investigating.depth_source && (
-                <p className="text-ink-muted">depth established via {investigating.depth_source}</p>
-              )}
-            </section>
-
-            {/* engineer feedback */}
-            <section className="border-t border-surface-border pt-3">
-              <p className="text-[10px] uppercase tracking-wider text-ink-muted">
-                Record your decision
-              </p>
-              <input
-                value={engineer}
-                onChange={(e) => setEngineer(e.target.value)}
-                placeholder="engineer name"
-                aria-label="Engineer name"
-                className="mt-2 w-full rounded-card border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-ink-primary placeholder:text-ink-muted focus:border-accent focus:outline-none"
-              />
-              <textarea
-                value={actionNote}
-                onChange={(e) => setActionNote(e.target.value)}
-                placeholder="action taken"
-                aria-label="Action taken"
-                rows={2}
-                className="mt-2 w-full rounded-card border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-ink-primary placeholder:text-ink-muted focus:border-accent focus:outline-none"
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {["accepted", "rejected", "investigating"].map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => recordAction(d)}
-                    className="rounded-pill border border-surface-border px-3 py-1 text-[11px] text-ink-secondary hover:bg-surface-hover"
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-              {actionSaved && <p className="mt-2 text-[11px] text-state-ok">{actionSaved}</p>}
-              {actionError && <p className="mt-2 text-[11px] text-state-bad">{actionError}</p>}
-            </section>
-          </div>
-        </div>
+        <InvestigationDrawer
+          item={investigating}
+          onClose={closeInvestigation}
+          paused={pausedByInvestigation}
+          engineer={engineer}
+          setEngineer={setEngineer}
+          actionNote={actionNote}
+          setActionNote={setActionNote}
+          recordAction={recordAction}
+          actionSaved={actionSaved}
+          actionError={actionError}
+        />
       )}
 
       {/* ---------------------------------------------------- event detail drawer */}
@@ -657,6 +703,236 @@ export default function Simulator() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The investigation drawer: the whole reasoning chain behind one piece of evidence.
+ *
+ * Analogue well → what happened → what was done → what came of it → where it is written
+ * down. The report-passage section is the institutional memory reached from here rather
+ * than from a separate page: it runs the same semantic search the Reports page runs,
+ * seeded with this event's own words, and shows the passages with their page citations.
+ */
+function InvestigationDrawer({
+  item,
+  onClose,
+  paused,
+  engineer,
+  setEngineer,
+  actionNote,
+  setActionNote,
+  recordAction,
+  actionSaved,
+  actionError,
+}: {
+  item: HistoricalEvidence;
+  onClose: () => void;
+  paused: boolean;
+  engineer: string;
+  setEngineer: (value: string) => void;
+  actionNote: string;
+  setActionNote: (value: string) => void;
+  recordAction: (decision: string) => void;
+  actionSaved: string | null;
+  actionError: string | null;
+}) {
+  // The query is the event's own recorded words, so a passage that comes back is
+  // genuinely about this event rather than about a phrase composed here.
+  const query = [item.formation_name, item.event_type, item.description]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 300);
+
+  const [searchRequested, setSearchRequested] = useState(false);
+  const passages = useQuery({
+    queryKey: ["investigation-passages", item.event_id, query],
+    queryFn: () => api.searchDocuments(query, { limit: 3 }),
+    enabled: searchRequested && query.trim().length >= 2,
+    retry: false,
+  });
+
+  return (
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-surface-border bg-surface-raised p-4 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-ink-primary">Investigation</h2>
+          <p className="text-[11px] text-ink-muted">
+            Evidence retrieved from the database, not generated
+            {paused && " · replay paused"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close investigation"
+          className="rounded-pill border border-surface-border px-3 py-1 text-xs text-ink-secondary hover:bg-surface-hover"
+        >
+          Close
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-4 text-xs">
+        <section>
+          <p className="text-[10px] uppercase tracking-wider text-ink-muted">Analogue well</p>
+          <p className="text-ink-primary">{item.well_name}</p>
+          <p className="text-ink-muted">
+            similarity {formatNumber(item.similarity_score, 4)}
+            {item.distance_from_bit_m != null &&
+              ` · ${relationToBit(item.distance_from_bit_m)}`}
+          </p>
+        </section>
+
+        <section>
+          <p className="text-[10px] uppercase tracking-wider text-ink-muted">
+            What happened there
+          </p>
+          <p className="text-ink-secondary">{item.description}</p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <Tag>{item.event_type}</Tag>
+            {item.formation_name && <Tag>{item.formation_name}</Tag>}
+            {item.depth_start_m != null && (
+              <Tag>{formatNumber(item.depth_start_m, 0)} m</Tag>
+            )}
+          </div>
+        </section>
+
+        <section>
+          <p className="text-[10px] uppercase tracking-wider text-ink-muted">
+            What was done about it
+          </p>
+          {item.mitigations.length === 0 ? (
+            <p className="text-ink-muted">
+              No validated historical mitigation found for this event. NWIS retrieves
+              actions that were recorded; it does not generate one.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {item.mitigations.map((m, i) => (
+                <li key={i} className="rounded-card border border-surface-border bg-surface-overlay p-2">
+                  <p className="text-ink-primary">{String(m.action_taken ?? "—")}</p>
+                  {m.outcome ? (
+                    <p className="mt-0.5 text-ink-muted">outcome: {String(m.outcome)}</p>
+                  ) : (
+                    <p className="mt-0.5 text-ink-muted">outcome: No data available</p>
+                  )}
+                  <p className="mt-0.5 text-[10px] text-ink-muted">
+                    source: {String(m.source_reference ?? m.source_dataset ?? "No data available")}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <p className="text-[10px] uppercase tracking-wider text-ink-muted">Provenance</p>
+          <p className="text-ink-muted">
+            {item.source_dataset ?? "No data available"}
+            {item.source_reference ? ` · ${item.source_reference}` : ""}
+          </p>
+          {item.depth_source && (
+            <p className="text-ink-muted">depth established via {item.depth_source}</p>
+          )}
+        </section>
+
+        {/* ------------------------------------------- institutional memory */}
+        <section className="border-t border-surface-border pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-wider text-ink-muted">
+              Report passages
+            </p>
+            {!searchRequested && (
+              <button
+                type="button"
+                onClick={() => setSearchRequested(true)}
+                className="rounded-pill border border-surface-border px-3 py-1 text-[11px] text-accent-strong hover:bg-surface-hover"
+              >
+                Search reports
+              </button>
+            )}
+          </div>
+          {!searchRequested ? (
+            <p className="mt-1 text-ink-muted">
+              Searches the ingested scanned reports for passages about this event, and
+              cites the page each came from.
+            </p>
+          ) : passages.isPending ? (
+            <Loading label="Searching report passages" />
+          ) : passages.isError ? (
+            <ErrorState error={passages.error} onRetry={() => passages.refetch()} />
+          ) : passages.data.results.length === 0 ? (
+            <p className="mt-1 text-ink-muted">
+              No passage in the ingested reports is close enough to this event.{" "}
+              {passages.data.provenance.passages_indexed} of{" "}
+              {passages.data.provenance.passages_total} stored passages are indexed, so
+              this is what the corpus holds, not everything ever written.
+            </p>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {passages.data.results.map((p) => (
+                <article
+                  key={p.chunk_id}
+                  className="rounded-card border border-surface-border bg-surface-overlay p-2"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-ink-primary">{p.well_name ?? "Well not linked"}</span>
+                    {p.page_number != null && <Tag>page {p.page_number}</Tag>}
+                    <span className="ml-auto font-mono text-[10px] text-ink-muted">
+                      {formatNumber(p.similarity, 3)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-ink-muted">{p.document_title}</p>
+                  <p className="mt-1 line-clamp-6 whitespace-pre-wrap text-[11px] leading-relaxed text-ink-secondary">
+                    {p.text}
+                  </p>
+                </article>
+              ))}
+              <p className="text-[10px] text-ink-muted">
+                Searched {passages.data.provenance.passages_searched} of{" "}
+                {passages.data.provenance.passages_total} stored passages.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* engineer feedback */}
+        <section className="border-t border-surface-border pt-3">
+          <p className="text-[10px] uppercase tracking-wider text-ink-muted">
+            Record your decision
+          </p>
+          <input
+            value={engineer}
+            onChange={(e) => setEngineer(e.target.value)}
+            placeholder="engineer name"
+            aria-label="Engineer name"
+            className="mt-2 w-full rounded-card border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-ink-primary placeholder:text-ink-muted focus:border-accent focus:outline-none"
+          />
+          <textarea
+            value={actionNote}
+            onChange={(e) => setActionNote(e.target.value)}
+            placeholder="action taken"
+            aria-label="Action taken"
+            rows={2}
+            className="mt-2 w-full rounded-card border border-surface-border bg-surface-overlay px-3 py-1.5 text-xs text-ink-primary placeholder:text-ink-muted focus:border-accent focus:outline-none"
+          />
+          <div className="mt-2 flex flex-wrap gap-2">
+            {["accepted", "rejected", "investigating"].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => recordAction(d)}
+                className="rounded-pill border border-surface-border px-3 py-1 text-[11px] text-ink-secondary hover:bg-surface-hover"
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+          {actionSaved && <p className="mt-2 text-[11px] text-state-ok">{actionSaved}</p>}
+          {actionError && <p className="mt-2 text-[11px] text-state-bad">{actionError}</p>}
+        </section>
+      </div>
     </div>
   );
 }

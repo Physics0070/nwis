@@ -35,17 +35,17 @@ const CHANNELS: ChannelSpec[] = [
   { key: "surface_torque_knm", label: "Surface torque", unit: "kN·m", colour: "#e2703a" },
 ];
 
-// How far the bit must move before geological context is re-queried.
-const DEPTH_CONTEXT_STEP_M = 25;
-
-// Predictions are stored every 5 m; beyond this the nearest one no longer describes
-// the bit's position and nothing is shown rather than something misleading.
-const LITHOLOGY_MATCH_TOLERANCE_M = 10;
-
 export default function ActiveWell() {
   const { wellId } = useParams();
   const id = Number(wellId);
   const [speed, setSpeed] = useState<number>(600);
+
+  // How far the bit must move before geological context is re-queried, and how close a
+  // stored lithology prediction has to be to describe the bit's position, both come from
+  // the backend's configuration rather than from constants duplicated here.
+  const status = useQuery({ queryKey: ["status"], queryFn: api.status });
+  const depthStep = status.data?.config.depth_context_step_m ?? null;
+  const lithologyTolerance = status.data?.config.lithology_match_tolerance_m ?? null;
 
   const well = useQuery({ queryKey: ["well", id], queryFn: () => api.getWell(id) });
   const { samples, latest, replayState, connection, lastError, setReplayState } =
@@ -60,23 +60,23 @@ export default function ActiveWell() {
   const [manualDepth, setManualDepth] = useState<string>("");
 
   useEffect(() => {
-    if (currentDepth === null) return;
-    const quantised = Math.round(currentDepth / DEPTH_CONTEXT_STEP_M) * DEPTH_CONTEXT_STEP_M;
+    if (currentDepth === null || depthStep === null) return;
+    const quantised = Math.round(currentDepth / depthStep) * depthStep;
     setContextDepth((previous) => (previous === quantised ? previous : quantised));
-  }, [currentDepth]);
+  }, [currentDepth, depthStep]);
 
   // A well without telemetry has no bit to follow, so geological context would never
   // resolve and the panels would stay empty. Historical wells open at mid-depth, which
   // is inside the logged interval, and the engineer can query any depth from there.
   useEffect(() => {
-    if (currentDepth !== null || contextDepth !== null) return;
+    if (currentDepth !== null || contextDepth !== null || depthStep === null) return;
     const totalDepth = well.data?.total_depth_md_m;
     if (totalDepth) {
-      const start = Math.round(totalDepth / 2 / DEPTH_CONTEXT_STEP_M) * DEPTH_CONTEXT_STEP_M;
+      const start = Math.round(totalDepth / 2 / depthStep) * depthStep;
       setContextDepth(start);
       setManualDepth(String(start));
     }
-  }, [well.data, currentDepth, contextDepth]);
+  }, [well.data, currentDepth, contextDepth, depthStep]);
 
   const nearby = useQuery({
     queryKey: ["nearby", id],
@@ -119,7 +119,8 @@ export default function ActiveWell() {
   );
 
   const currentLithology = useMemo(() => {
-    if (!lithology.data?.length || contextDepth === null) return null;
+    if (!lithology.data?.length || contextDepth === null || lithologyTolerance === null)
+      return null;
     // Nearest stored prediction to the bit, provided it is within one decimation step.
     let best = lithology.data[0];
     for (const row of lithology.data) {
@@ -127,10 +128,8 @@ export default function ActiveWell() {
         best = row;
       }
     }
-    return Math.abs(best.depth_md_m - contextDepth) <= LITHOLOGY_MATCH_TOLERANCE_M
-      ? best
-      : null;
-  }, [lithology.data, contextDepth]);
+    return Math.abs(best.depth_md_m - contextDepth) <= lithologyTolerance ? best : null;
+  }, [lithology.data, contextDepth, lithologyTolerance]);
 
   const currentFormation = useMemo(() => {
     if (!formations.data || contextDepth === null) return null;
